@@ -1,0 +1,16 @@
+{
+  "name": "Go + TypeScript Dev",
+  "image": "golang:1.24",
+  "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "golang.go",                   
+        "ms-vscode.vscode-typescript-next", 
+        "dbaeumer.vscode-eslint",    
+        "esbenp.prettier-vscode"    
+      ]
+    }
+  },
+  "postCreateCommand": "curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && apt-get install -y nodejs && npm install -g typescript"
+}

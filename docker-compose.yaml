@@ -1,0 +1,42 @@
+services:
+  db:
+    image: mysql:8
+    command: --bind-address=127.0.0.1
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: fund
+      MYSQL_USER: fund
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - dbdata:/var/lib/mysql
+      - ./migrations/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$$MYSQL_ROOT_PASSWORD"]
+      interval: 5s
+      retries: 20
+    network_mode: host
+
+  backend:
+    build: ./backend
+    restart: on-failure
+    environment:
+      HTTP_ADDR: 127.0.0.1:8080
+      DATABASE_URL: fund:${DB_PASSWORD}@tcp(127.0.0.1:3306)/fund?parseTime=true&charset=utf8mb4
+      FILES_DIR: /app/uploads
+    volumes:
+      - uploads:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+    network_mode: host
+
+  frontend:
+    build: ./frontend
+    restart: on-failure
+    depends_on:
+      - backend
+    network_mode: host
+
+volumes:
+  dbdata:
+  uploads:
