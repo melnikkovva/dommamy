@@ -22,6 +22,7 @@ type Repository interface {
 	ById(id int) (*Mother, error)
 	GetAll() ([]*Mother, error)
 	UpdateLearnUserID(id int, learnUserID string) error
+	UpdatePhotoURL(id int, photoURL string) error
 }
 
 func NewService(repo Repository, learnStatsRepo LearnStatsRepository) *Service {
@@ -90,4 +91,12 @@ func (s *Service) GetCourses(motherId int) ([]learn.CourseResult, error) {
 		return []learn.CourseResult{}, nil
 	}
 	return s.learnStatsRepo.GetCourseResults(m.LearnUserID)
+}
+
+func (s *Service) UpdatePhotoURL(id int, photoURL string) error {
+	_, err := s.repo.ById(id)
+	if err != nil {
+		return err
+	}
+	return s.repo.UpdatePhotoURL(id, photoURL)
 }

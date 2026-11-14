@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { getChildren, getMothers, getMotherStatus, getProfile } from '../api/mothers'
+import { getChildren, getMothers, getMotherStatus, getProfile, uploadPhoto } from '../api/mothers'
 import { useLoad } from '../hooks/useLoad'
 import LoadState from '../components/LoadState'
 import { MotherStatusBadge } from '../components/Badges'
+import { useToast } from '../components/Toast'
 import InfoTab from './mother/InfoTab'
 import DocumentsTab from './mother/DocumentsTab'
 import HelpTab from './mother/HelpTab'
@@ -24,6 +25,9 @@ const tabs: [string, string][] = [
 export default function MotherPage() {
   const id = Number(useParams().id)
   const [tab, setTab] = useState('info')
+  const [viewPhoto, setViewPhoto] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const toast = useToast()
   const { data, error, reload } = useLoad(async () => {
     const [mothers, children, profile, status] = await Promise.all([getMothers(), getChildren(id), getProfile(id), getMotherStatus(id)])
     return { mother: mothers.find((m) => m.id === id) || null, children, profile, status }
@@ -35,6 +39,25 @@ export default function MotherPage() {
   }
   const initials = ((mother.last_name[0] || '') + (mother.first_name[0] || '')).toUpperCase()
   const childrenText = data.children.map((c) => c.first_name + ', ' + yearsText(ageYears(c.birth_date))).join(' · ')
+  const hasPhoto = !!mother.photo_url
+
+  async function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.size > 5 * 1024 * 1024) {
+      toast('Фото не должно превышать 5 МБ', true)
+      return
+    }
+    try {
+      await uploadPhoto(id, file)
+      toast('Фото загружено')
+      reload()
+    } catch (err: any) {
+      toast(err.message || 'Ошибка загрузки', true)
+    }
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
   return (
     <div>
       <div className="page-head">
@@ -45,7 +68,15 @@ export default function MotherPage() {
         <Link className="btn btn-primary" to={'/help?mother=' + mother.id}>+ Выдать помощь</Link>
       </div>
       <div className="card summary">
-        <div className="avatar">{initials}</div>
+        <div className="avatar-wrap">
+          {hasPhoto ? (
+            <img className="avatar" src={mother.photo_url} alt="" onClick={() => setViewPhoto(mother.photo_url || null)} />
+          ) : (
+            <div className="avatar">{initials}</div>
+          )}
+          <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" onChange={handlePhotoUpload} style={{ display: 'none' }} />
+          <button className="btn-upload-photo" onClick={() => fileInputRef.current?.click()} title="Загрузить фото">+</button>
+        </div>
         <div><div className="label">Контакт</div>{mother.phone || '—'}</div>
         <div><div className="label">Дети</div>{childrenText || '—'}</div>
         <div><div className="label">Обратилась</div>{fmtDate(mother.created_at)}</div>
@@ -62,6 +93,11 @@ export default function MotherPage() {
       {tab === 'events' && <EventsTab motherId={id} />}
       {tab === 'courses' && <CoursesTab motherId={id} />}
       {tab === 'requests' && <RequestsTab motherId={id} />}
+      {viewPhoto && (
+        <div className="modal-backdrop" onClick={() => setViewPhoto(null)}>
+          <img className="photo-view" src={viewPhoto} alt="Фото" onClick={(e) => e.stopPropagation()} />
+        </div>
+      )}
     </div>
   )
 }

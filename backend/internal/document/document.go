@@ -22,7 +22,7 @@ var ErrorSigned = errors.New("the document is already signed")
 var ErrorNoFile = errors.New("upload the scan first")
 var ErrorEmptyFile = errors.New("the file is empty")
 var ErrorTooBig = errors.New("the file is too big (max 10 MB)")
-var ErrorFileType = errors.New("only PDF, JPG and PNG files are allowed")
+var ErrorFileType = errors.New("only PDF, JPG, PNG, DOC, DOCX, XLS, XLSX, PPT, PPTX, ZIP, TXT, CSV files are allowed")
 var ErrorSignDate = errors.New("the signing date is incorrect")
 
 const (
@@ -43,6 +43,16 @@ var extensions = map[string]string{
 	"application/pdf": ".pdf",
 	"image/jpeg": ".jpg",
 	"image/png": ".png",
+	"application/msword": ".doc",
+	"application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
+	"application/vnd.ms-excel": ".xls",
+	"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": ".xlsx",
+	"application/vnd.ms-powerpoint": ".ppt",
+	"application/vnd.openxmlformats-officedocument.presentationml.presentation": ".pptx",
+	"application/zip": ".zip",
+	"application/x-zip-compressed": ".zip",
+	"text/plain": ".txt",
+	"text/csv": ".csv",
 }
 
 type Document struct {

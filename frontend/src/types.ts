@@ -1,4 +1,4 @@
-export type Mother = { id: number; first_name: string; last_name: string; phone: string; created_at: string }
+export type Mother = { id: number; first_name: string; last_name: string; phone: string; photo_url?: string; created_at: string }
 export type Child = { id: number; mother_id: number; first_name: string; birth_date: string }
 export type SecretInfo = { criminal_record: string; nd_pnd: string; drugs: string; chronic_diseases: string }
 export type HelpItem = { id: number; mother_id: number; kind: string; sum: number; check_url: string; created_at: string }

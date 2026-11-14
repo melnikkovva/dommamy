@@ -18,6 +18,7 @@ type Mother struct {
 	Phone string
 	Email string
 	LearnUserID string
+	PhotoURL string
 	CreatedAt time.Time
 	CourseStats *learn.CourseStats
 }

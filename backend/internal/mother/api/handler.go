@@ -1,8 +1,14 @@
 package api
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
+	"io"
+	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"time"
@@ -12,10 +18,11 @@ import (
 
 type MotherHandler struct {
 	s *mother.Service
+	photoDir string
 }
 
-func NewMotherHandler(s *mother.Service) *MotherHandler{
-	return &MotherHandler{s: s}
+func NewMotherHandler(s *mother.Service, photoDir string) *MotherHandler{
+	return &MotherHandler{s: s, photoDir: photoDir}
 }
 
 var coursesPathRe = regexp.MustCompile(`^/api/mother/([^/]+)/courses$`)
@@ -23,6 +30,7 @@ var coursesPathRe = regexp.MustCompile(`^/api/mother/([^/]+)/courses$`)
 func (h *MotherHandler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/mother", h.create)
 	mux.HandleFunc("GET /api/mother", h.search)
+	mux.HandleFunc("POST /api/mother/{id}/photo", h.uploadPhoto)
 	mux.HandleFunc("GET /api/mother/", h.coursesRouter)
 }
 
@@ -48,6 +56,7 @@ type motherResponse struct {
 	Phone string `json:"phone"`
 	Email string `json:"email"`
 	LearnUserID string `json:"learn_user_id"`
+	PhotoURL string `json:"photo_url,omitempty"`
 	CreatedAt time.Time `json:"created_at"`
 	CourseStats *courseStatsResponse `json:"course_stats,omitempty"`
 }
@@ -60,6 +69,7 @@ func handleToMotherResponse(m *mother.Mother) motherResponse {
 		Phone: m.Phone, 
 		Email: m.Email,
 		LearnUserID: m.LearnUserID,
+		PhotoURL: m.PhotoURL,
 		CreatedAt: m.CreatedAt,
 	}
 	if m.CourseStats != nil {
@@ -160,5 +170,75 @@ func sendJSON(w http.ResponseWriter, status int, data any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(data)
+}
+
+const maxPhotoSize = 5 << 20 // 5 MB
+
+var allowedPhotoTypes = map[string]bool{
+	"image/jpeg": true,
+	"image/png": true,
+	"image/webp": true,
+}
+
+func (h *MotherHandler) uploadPhoto(w http.ResponseWriter, r *http.Request) {
+	motherId, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil {
+		sendJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect id"})
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, maxPhotoSize+(1<<20))
+	file, header, err := r.FormFile("photo")
+	if err != nil {
+		sendJSON(w, http.StatusBadRequest, map[string]string{"error": "send the photo in the field 'photo' (max 5 MB)"})
+		return
+	}
+	defer file.Close()
+
+	contentType := http.DetectContentType(make([]byte, 0))
+	buf := make([]byte, 512)
+	n, _ := file.Read(buf)
+	if n > 0 {
+		contentType = http.DetectContentType(buf[:n])
+	}
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		log.Println("error seek photo:", err)
+		sendJSON(w, http.StatusInternalServerError, map[string]string{"error": "something went wrong"})
+		return
+	}
+	if !allowedPhotoTypes[contentType] {
+		sendJSON(w, http.StatusUnprocessableEntity, map[string]string{"error": "only JPEG, PNG or WebP images are allowed"})
+		return
+	}
+
+	ext := filepath.Ext(header.Filename)
+	if ext == "" {
+		ext = ".jpg"
+	}
+	randomBytes := make([]byte, 16)
+	rand.Read(randomBytes)
+	fileName := hex.EncodeToString(randomBytes) + ext
+
+	f, err := os.OpenFile(filepath.Join(h.photoDir, fileName), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+	if err != nil {
+		log.Println("error saving photo:", err)
+		sendJSON(w, http.StatusInternalServerError, map[string]string{"error": "something went wrong"})
+		return
+	}
+	if _, err := io.Copy(f, file); err != nil {
+		f.Close()
+		os.Remove(filepath.Join(h.photoDir, fileName))
+		log.Println("error copying photo:", err)
+		sendJSON(w, http.StatusInternalServerError, map[string]string{"error": "something went wrong"})
+		return
+	}
+	f.Close()
+
+	photoURL := "/api/photos/" + fileName
+	if err := h.s.UpdatePhotoURL(motherId, photoURL); err != nil {
+		sendJSON(w, http.StatusUnprocessableEntity, map[string]string{"error": err.Error()})
+		return
+	}
+	sendJSON(w, http.StatusOK, map[string]string{"photo_url": photoURL})
 }
 

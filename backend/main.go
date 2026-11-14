@@ -1,12 +1,13 @@
 package main
 
 import (
+	"context"
 	"database/sql"
+	"errors"
 	"log"
 	"net/http"
 	"os"
-	"context"
-	"errors"
+	"path/filepath"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -140,10 +141,18 @@ func main() {
 		log.Fatal("база недоступна: ", err)
 	}
 
+	filesDir := os.Getenv("FILES_DIR")
+	if filesDir == "" {
+		filesDir = "./uploads"
+	}
+	if err := os.MkdirAll(filesDir, 0o750); err != nil {
+		log.Fatal("папка для файлов недоступна: ", err)
+	}
+
 	motherRepo := mothermysql.NewRepo(db)
 	learnRepo := learnmysql.NewRepo(db)
 	motherService := mother.NewService(motherRepo, learnRepo)
-	motherHandler := motherapi.NewMotherHandler(motherService)
+	motherHandler := motherapi.NewMotherHandler(motherService, filesDir)
 
 	watchingRepo := watchingmysql.NewRepo(db)
 
@@ -175,10 +184,6 @@ func main() {
 	requestService := request.NewService(requestRepo, motherService, helpAdapter{s: helpService})
 	requestHandler := requestapi.New(requestService)
 
-	filesDir := os.Getenv("FILES_DIR")
-	if filesDir == "" {
-		filesDir = "./uploads"
-	}
 	files, err := documentstorage.NewLocal(filesDir)
 	if err != nil {
 		log.Fatal("папка для файлов недоступна: ", err)
@@ -208,6 +213,16 @@ func main() {
 	documentHandler.Register(mux)
 	donorHandler.Register(mux)
 	reportHandler.Register(mux)
+
+	mux.Handle("GET /api/photos/{path...}", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fileName := r.PathValue("path")
+		if fileName == "" {
+			http.NotFound(w, nil)
+			return
+		}
+		filePath := filepath.Join(filesDir, fileName)
+		http.ServeFile(w, r, filePath)
+	}))
 
 	learnAPIBaseURL := os.Getenv("LEARN_API_BASE_URL")
 	learnAPIClientID := os.Getenv("LEARN_API_CLIENT_ID")

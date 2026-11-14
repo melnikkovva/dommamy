@@ -111,7 +111,7 @@ export default function DocumentsTab({ motherId }: { motherId: number }) {
                         {d.has_file ? 'Заменить скан' : 'Загрузить скан'}
                         <input
                           type="file"
-                          accept=".pdf,.jpg,.jpeg,.png"
+                          accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.txt,.csv"
                           onChange={(e) => {
                             const file = e.target.files ? e.target.files[0] : null
                             if (file) upload(d.id, file)
