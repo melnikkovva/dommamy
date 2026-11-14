@@ -9,14 +9,16 @@ import DocumentsTab from './mother/DocumentsTab'
 import HelpTab from './mother/HelpTab'
 import EventsTab from './mother/EventsTab'
 import RequestsTab from './mother/RequestsTab'
+import CoursesTab from './mother/CoursesTab'
 import { ageYears, fmtDate, fullName, yearsText } from '../utils/format'
 
 const tabs: [string, string][] = [
   ['info', 'Анкета и дети'],
   ['documents', 'Документы'],
   ['help', 'История помощи'],
-  ['requests', 'Запросы'],
-  ['events', 'Мероприятия']
+  ['events', 'Мероприятия'],
+  ['courses', 'Курсы'],
+  ['requests', 'Заметки']
 ]
 
 export default function MotherPage() {
@@ -57,8 +59,9 @@ export default function MotherPage() {
       {tab === 'info' && <InfoTab motherId={id} profile={data.profile} status={data.status} childList={data.children} onChanged={reload} />}
       {tab === 'documents' && <DocumentsTab motherId={id} />}
       {tab === 'help' && <HelpTab motherId={id} />}
-      {tab === 'requests' && <RequestsTab motherId={id} />}
       {tab === 'events' && <EventsTab motherId={id} />}
+      {tab === 'courses' && <CoursesTab motherId={id} />}
+      {tab === 'requests' && <RequestsTab motherId={id} />}
     </div>
   )
 }

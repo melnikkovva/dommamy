@@ -3,7 +3,10 @@ CREATE TABLE IF NOT EXISTS mother (
     first_name VARCHAR(50) NOT NULL, 
     last_name VARCHAR(50) NOT NULL, 
     phone VARCHAR(20) NOT NULL DEFAULT '', 
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    email VARCHAR(255) NOT NULL DEFAULT '', 
+    learn_user_id VARCHAR(50) NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (learn_user_id) REFERENCES lms_learners(user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS help_items (

@@ -61,3 +61,17 @@ export type Donation = { id: number; donor_id: number; amount: number; date: str
 export type DonorDetails = { donor: Donor; donations: Donation[] }
 export type ReportTotal = { label: string; value: string }
 export type Report = { name: string; title: string; headers: string[]; rows: string[][]; totals: ReportTotal[] }
+export type CourseItem = {
+  course_id: string
+  name_course: string
+  access_date: string
+  due_date?: string
+  completion_date?: string
+  time_spent: number
+  duration: number
+  completion_status: string
+  progress: number
+  awarded_score?: number
+  is_overdue: boolean
+  views_count: number
+}

@@ -7,6 +7,7 @@ import (
 	"os"
 	"context"
 	"errors"
+	"time"
 
 	_ "github.com/go-sql-driver/mysql"
 
@@ -56,6 +57,10 @@ import (
 	"backend/internal/report"
 	reportapi "backend/internal/report/api"
 	reportmysql "backend/internal/report/mysql"
+
+	"backend/internal/learn"
+	learnclient "backend/internal/learn/infrastructure/client"
+	learnmysql "backend/internal/learn/infrastructure/mysql"
 )
 
 type helpAdapter struct {
@@ -73,6 +78,54 @@ func (a helpAdapter) MotherOf(helpId int) (int, bool, error) {
 	return item.MotherId, true, nil
 }
 
+type motherReaderAdapter struct {
+	repo mother.Repository
+}
+
+func (a motherReaderAdapter) GetAll() ([]learn.MotherRef, error) {
+	mothers, err := a.repo.GetAll()
+	if err != nil {
+		return nil, err
+	}
+	result := make([]learn.MotherRef, len(mothers))
+	for i, m := range mothers {
+		result[i] = learn.MotherRef{
+			Id:        m.Id,
+			FirstName: m.FirstName,
+			LastName:  m.LastName,
+			Phone:     m.Phone,
+			Email:     m.Email,
+		}
+	}
+	return result, nil
+}
+
+func (a motherReaderAdapter) UpdateLearnUserID(id int, learnUserID string) error {
+	return a.repo.UpdateLearnUserID(id, learnUserID)
+}
+
+type learnerReaderAdapter struct {
+	repo *learnmysql.Repo
+}
+
+func (a learnerReaderAdapter) GetAllLearners() ([]learn.Learner, error) {
+	learners, err := a.repo.GetAllLearners()
+	if err != nil {
+		return nil, err
+	}
+	result := make([]learn.Learner, len(learners))
+	for i, l := range learners {
+		result[i] = learn.Learner{
+			UserId:    l.UserId,
+			Login:     l.Login,
+			Email:     l.Email,
+			FirstName: l.FirstName,
+			LastName:  l.LastName,
+		}
+	}
+	return result, nil
+}
+
 func main() {
 	addr := os.Getenv("HTTP_ADDR")
 	if addr == "" {
@@ -88,7 +141,8 @@ func main() {
 	}
 
 	motherRepo := mothermysql.NewRepo(db)
-	motherService := mother.NewService(motherRepo)
+	learnRepo := learnmysql.NewRepo(db)
+	motherService := mother.NewService(motherRepo, learnRepo)
 	motherHandler := motherapi.NewMotherHandler(motherService)
 
 	watchingRepo := watchingmysql.NewRepo(db)
@@ -154,6 +208,35 @@ func main() {
 	documentHandler.Register(mux)
 	donorHandler.Register(mux)
 	reportHandler.Register(mux)
+
+	learnAPIBaseURL := os.Getenv("LEARN_API_BASE_URL")
+	learnAPIClientID := os.Getenv("LEARN_API_CLIENT_ID")
+	learnAPIClientSecret := os.Getenv("LEARN_API_CLIENT_SECRET")
+
+	var learnAPI learn.LearnApiClient
+	if learnAPIBaseURL != "" && learnAPIClientID != "" && learnAPIClientSecret != "" {
+		learnAPI = learnclient.NewClient(learnAPIBaseURL, learnAPIClientID, learnAPIClientSecret)
+		log.Println("Learn API клиент настроен (OAuth 2.0)")
+	} else {
+		log.Println("Learn API не настроен: укажите LEARN_API_BASE_URL, LEARN_API_CLIENT_ID и LEARN_API_CLIENT_SECRET в .env")
+	}
+
+	learnSyncService := learn.NewSyncService(learnRepo, learnAPI)
+	learnSyncService.SetLinker(learnerReaderAdapter{repo: learnRepo}, motherReaderAdapter{repo: motherRepo})
+
+	go func() {
+		for {
+			if learnAPI != nil {
+				if err := learnSyncService.SyncAll(); err != nil {
+					log.Printf("SyncAll ошибка: %v", err)
+				}
+			}
+			if err := learnSyncService.SyncUsers(); err != nil {
+				log.Printf("SyncUsers ошибка: %v", err)
+			}
+			time.Sleep(5 * time.Minute)
+		}
+	}()
 
 	log.Println("сервер запущен на", addr)
 	log.Fatal(http.ListenAndServe(addr, mux))

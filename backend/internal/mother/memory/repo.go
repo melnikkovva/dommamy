@@ -41,3 +41,17 @@ func (r *Repo) ById(id int) (*mother.Mother, error) {
 	}
 	return nil, mother.ErrorNotFound
 }
+
+func (r *Repo) GetAll() ([]*mother.Mother, error) {
+	return r.items, nil
+}
+
+func (r *Repo) UpdateLearnUserID(id int, learnUserID string) error {
+	for _, m := range r.items {
+		if m.Id == id {
+			m.LearnUserID = learnUserID
+			return nil
+		}
+	}
+	return mother.ErrorNotFound
+}

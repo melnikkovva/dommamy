@@ -1,5 +1,5 @@
 import { get, getList, post, put } from './client'
-import type { Child, Mother, MotherStatusInfo, MotherStatusItem, Profile, ProfileSummary, SecretInfo } from '../types'
+import type { Child, CourseItem, Mother, MotherStatusInfo, MotherStatusItem, Profile, ProfileSummary, SecretInfo } from '../types'
 
 export const getMothers = (q = '') => getList<Mother>('/api/mother?q=' + encodeURIComponent(q))
 export const createMother = (first_name: string, last_name: string, phone: string) =>
@@ -20,3 +20,4 @@ export const getMotherStatus = (motherId: number) => get<MotherStatusInfo>('/api
 export const setMotherStatus = (motherId: number, status: string, reason: string) =>
   put<{ status: string }>('/api/mother/' + motherId + '/status', { status, reason })
 export const getMotherStatuses = () => getList<MotherStatusItem>('/api/mother-statuses')
+export const getCourses = (motherId: number) => getList<CourseItem>('/api/mother/' + motherId + '/courses')

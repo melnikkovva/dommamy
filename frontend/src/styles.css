@@ -517,3 +517,86 @@ tr.clickable:hover td {
 .nav a.active {
   color: var(--green);
 }
+
+.courses-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.course-card h3 {
+  font-size: 17px;
+  margin: 0 0 8px;
+}
+
+.course-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.progress-section {
+  margin: 14px 0;
+}
+
+.progress-label {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.progress-value {
+  float: right;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--green);
+}
+
+.progress-bar {
+  height: 8px;
+  background: var(--bg);
+  border-radius: 999px;
+  margin-top: 6px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--green);
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+.course-results {
+  margin: 12px 0;
+}
+
+.course-results p {
+  margin: 4px 0 0;
+  font-size: 14px;
+}
+
+.course-dates {
+  margin: 10px 0;
+}
+
+.course-dates p {
+  margin: 4px 0 0;
+  font-size: 14px;
+}
+
+.course-actions {
+  margin-top: 14px;
+}
+
+.empty-courses {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 20px 0;
+}
+
+.empty-icon {
+  font-size: 28px;
+}
