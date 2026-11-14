@@ -12,6 +12,8 @@ services:
       - ./migrations/init.sql:/docker-entrypoint-initdb.d/001_init.sql
       - ./migrations/002_add_learn.sql:/docker-entrypoint-initdb.d/002_add_learn.sql
       - ./migrations/add_photo_url.sql:/docker-entrypoint-initdb.d/003_add_photo_url.sql
+      - ./migrations/add_user.sql:/docker-entrypoint-initdb.d/004_add_user.sql
+      - ./migrations/seed_admin.sql:/docker-entrypoint-initdb.d/005_seed_admin.sql
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$$MYSQL_ROOT_PASSWORD"]
       interval: 5s

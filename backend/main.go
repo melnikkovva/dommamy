@@ -62,6 +62,10 @@ import (
 	"backend/internal/learn"
 	learnclient "backend/internal/learn/infrastructure/client"
 	learnmysql "backend/internal/learn/infrastructure/mysql"
+
+	"backend/internal/user"
+	userapi "backend/internal/user/api"
+	usermysql "backend/internal/user/mysql"
 )
 
 type helpAdapter struct {
@@ -201,6 +205,10 @@ func main() {
 	reportService := report.NewService(reportRepo)
 	reportHandler := reportapi.New(reportService)
 
+	userRepo := usermysql.NewRepo(db)
+	userService := user.NewService(userRepo, os.Getenv("AUTH_SECRET"), 24*time.Hour)
+	userHandler := userapi.New(userService)
+
 	mux := http.NewServeMux()
 	helpHandler.Register(mux)
 	motherHandler.Register(mux)
@@ -213,6 +221,7 @@ func main() {
 	documentHandler.Register(mux)
 	donorHandler.Register(mux)
 	reportHandler.Register(mux)
+	userHandler.Register(mux)
 
 	mux.Handle("GET /api/photos/{path...}", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fileName := r.PathValue("path")

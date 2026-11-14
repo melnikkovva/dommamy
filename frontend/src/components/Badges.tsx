@@ -1,6 +1,6 @@
 import { docTypeNames, label, motherStatusNames, participantStatusNames, profileStatusNames, requestStatusNames } from '../utils/labels'
 
-export function Badge({ text, kind }: { text: string; kind: 'ok' | 'wait' | 'muted' }) {
+export function Badge({ text, kind }: { text: string; kind: 'ok' | 'wait' | 'muted' | 'error' }) {
   return <span className={'badge badge-' + kind}>{text}</span>
 }
 export function ProfileBadge({ status }: { status: string }) {
@@ -11,7 +11,7 @@ export function MotherStatusBadge({ status }: { status: string }) {
   return <Badge text={label(motherStatusNames, status)} kind={kind} />
 }
 export function RequestBadge({ status }: { status: string }) {
-  const kind = status === 'issued' ? 'ok' : status === 'rejected' ? 'muted' : 'wait'
+  const kind = status === 'issued' ? 'ok' : status === 'rejected' ? 'error' : 'wait'
   return <Badge text={label(requestStatusNames, status)} kind={kind} />
 }
 export function ParticipantBadge({ status }: { status: string }) {

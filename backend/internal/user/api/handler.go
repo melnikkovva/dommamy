@@ -1,0 +1,163 @@
+package api
+
+import (
+	"encoding/json"
+	"errors"
+	"log"
+	"net/http"
+	"strconv"
+	"time"
+
+	"backend/internal/user"
+)
+
+type Handler struct {
+	s *user.Service
+}
+
+func New(s *user.Service) *Handler {
+	return &Handler{s: s}
+}
+
+func (h *Handler) Register(mux *http.ServeMux) {
+	mux.HandleFunc("POST /api/auth/login", h.login)
+	mux.HandleFunc("POST /api/auth/me", h.me)
+	mux.HandleFunc("POST /api/users", h.createUser)
+	mux.HandleFunc("GET /api/users", h.listUsers)
+	mux.HandleFunc("GET /api/users/{id}", h.getUser)
+}
+
+type loginBody struct {
+	Login    string `json:"login"`
+	Password string `json:"password"`
+}
+
+type loginResponse struct {
+	Token       string `json:"token"`
+	Id          int    `json:"id"`
+	Login       string `json:"login"`
+	FirstName   string `json:"first_name"`
+	LastName    string `json:"last_name"`
+	Role        string `json:"role"`
+}
+
+type userResponse struct {
+	Id        int    `json:"id"`
+	Login     string `json:"login"`
+	FirstName string `json:"first_name"`
+	LastName  string `json:"last_name"`
+	Role      string `json:"role"`
+	CreatedAt string `json:"created_at"`
+}
+
+type createUserBody struct {
+	Login     string `json:"login"`
+	Password  string `json:"password"`
+	FirstName string `json:"first_name"`
+	LastName  string `json:"last_name"`
+	Role      string `json:"role"`
+}
+
+func toUserResponse(u *user.User) userResponse {
+	return userResponse{
+		Id: u.Id, Login: u.Login, FirstName: u.FirstName, LastName: u.LastName,
+		Role: u.Role, CreatedAt: u.CreatedAt.Format(time.RFC3339),
+	}
+}
+
+func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
+	var req loginBody
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect JSON"})
+		return
+	}
+	token, u, err := h.s.Login(req.Login, req.Password)
+	if err != nil {
+		switch {
+		case errors.Is(err, user.ErrorInvalidCredentials):
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "Неверный логин или пароль"})
+		default:
+			log.Println("error login:", err)
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "something went wrong"})
+		}
+		return
+	}
+	writeJSON(w, http.StatusOK, loginResponse{
+		Token:     token,
+		Id:        u.Id,
+		Login:     u.Login,
+		FirstName: u.FirstName,
+		LastName:  u.LastName,
+		Role:      u.Role,
+	})
+}
+
+func (h *Handler) me(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]string{"message": "use login endpoint"})
+}
+
+func (h *Handler) createUser(w http.ResponseWriter, r *http.Request) {
+	var req createUserBody
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect JSON"})
+		return
+	}
+	if req.Role == "" {
+		req.Role = user.RoleUser
+	}
+	u, err := h.s.Create(req.Login, req.Password, req.FirstName, req.LastName, req.Role)
+	if err != nil {
+		switch {
+		case errors.Is(err, user.ErrorLoginTaken):
+			writeJSON(w, http.StatusConflict, map[string]string{"error": "Логин уже занят"})
+		case errors.Is(err, user.ErrorLogin), errors.Is(err, user.ErrorPassword),
+			errors.Is(err, user.ErrorName), errors.Is(err, user.ErrorSurname):
+			writeJSON(w, http.StatusUnprocessableEntity, map[string]string{"error": err.Error()})
+		default:
+			log.Println("error create user:", err)
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "something went wrong"})
+		}
+		return
+	}
+	writeJSON(w, http.StatusCreated, toUserResponse(u))
+}
+
+func (h *Handler) listUsers(w http.ResponseWriter, r *http.Request) {
+	items, err := h.s.ListUsers()
+	if err != nil {
+		log.Println("error list users:", err)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "something went wrong"})
+		return
+	}
+	result := []userResponse{}
+	for _, u := range items {
+		result = append(result, toUserResponse(u))
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (h *Handler) getUser(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect id"})
+		return
+	}
+	u, err := h.s.GetUser(id)
+	if err != nil {
+		switch {
+		case errors.Is(err, user.ErrorNotFound):
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "user not found"})
+		default:
+			log.Println("error get user:", err)
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "something went wrong"})
+		}
+		return
+	}
+	writeJSON(w, http.StatusOK, toUserResponse(u))
+}
+
+func writeJSON(w http.ResponseWriter, status int, data any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(data)
+}
