@@ -75,3 +75,39 @@ export type CourseItem = {
   is_overdue: boolean
   views_count: number
 }
+
+export type IprTask = {
+  task_id: string
+  task_type: string
+  title: string
+  description: string
+  status: string
+  is_overdue: boolean
+  absolute_due_date?: string
+  completion_date?: string
+}
+
+export type IprStage = {
+  stage_id: string
+  title: string
+  description: string
+  start_date?: string
+  end_date?: string
+  tasks: IprTask[]
+}
+
+export type IprPlan = {
+  plan_id: string
+  title: string
+  employee_id: string
+  mentor_id: string
+  mentor_name: string
+  start_date: string
+  end_date?: string
+  status: string
+  progress: number
+  completed_tasks: number
+  total_tasks: number
+  goals: string[]
+  stages: IprStage[]
+}

@@ -48,7 +48,7 @@ export default function EventPage() {
         <div>
           <h1>{event.title}</h1>
           <p className="muted">
-            <Link to="/events">Все мероприятия</Link> · {fmtDateTime(event.starts_at)} · {event.place || 'место не указано'} · мест: {event.max_people || 'без лимита'}
+            <Link to="/events">Все мероприятия</Link> {fmtDateTime(event.starts_at)}  {event.place || 'место не указано'}  мест: {event.max_people || 'без лимита'}
           </p>
         </div>
       </div>

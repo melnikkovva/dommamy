@@ -26,12 +26,13 @@ func NewMotherHandler(s *mother.Service, photoDir string) *MotherHandler{
 }
 
 var coursesPathRe = regexp.MustCompile(`^/api/mother/([^/]+)/courses$`)
+var iprPathRe = regexp.MustCompile(`^/api/mother/([^/]+)/ipr$`)
 
 func (h *MotherHandler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/mother", h.create)
 	mux.HandleFunc("GET /api/mother", h.search)
 	mux.HandleFunc("POST /api/mother/{id}/photo", h.uploadPhoto)
-	mux.HandleFunc("GET /api/mother/", h.coursesRouter)
+	mux.HandleFunc("GET /api/mother/", h.learnRouter)
 }
 
 type motherRequest struct {
@@ -127,13 +128,19 @@ type courseResultResponse struct {
 	ViewsCount       int       `json:"views_count"`
 }
 
-func (h *MotherHandler) coursesRouter(w http.ResponseWriter, r *http.Request) {
-	matches := coursesPathRe.FindStringSubmatch(r.URL.Path)
-	if matches == nil {
-		http.NotFound(w, nil)
+func (h *MotherHandler) learnRouter(w http.ResponseWriter, r *http.Request) {
+	if matches := coursesPathRe.FindStringSubmatch(r.URL.Path); matches != nil {
+		h.handleCourses(w, r, matches)
 		return
 	}
+	if matches := iprPathRe.FindStringSubmatch(r.URL.Path); matches != nil {
+		h.handleIPR(w, r, matches)
+		return
+	}
+	http.NotFound(w, nil)
+}
 
+func (h *MotherHandler) handleCourses(w http.ResponseWriter, r *http.Request, matches []string) {
 	motherId, err := strconv.Atoi(matches[1])
 	if err != nil {
 		sendJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid id"})
@@ -161,6 +168,100 @@ func (h *MotherHandler) coursesRouter(w http.ResponseWriter, r *http.Request) {
 			AwardedScore:     c.AwardedScore,
 			IsOverdue:        c.IsOverdue,
 			ViewsCount:       c.ViewsCount,
+		}
+	}
+	sendJSON(w, http.StatusOK, result)
+}
+
+type iprTaskResponse struct {
+	TaskID          string     `json:"task_id"`
+	TaskType        string     `json:"task_type"`
+	Title           string     `json:"title"`
+	Description     string     `json:"description"`
+	Status          string     `json:"status"`
+	IsOverdue       bool       `json:"is_overdue"`
+	AbsoluteDueDate *time.Time `json:"absolute_due_date,omitempty"`
+	CompletionDate  *time.Time `json:"completion_date,omitempty"`
+}
+
+type iprStageResponse struct {
+	StageID     string          `json:"stage_id"`
+	Title       string          `json:"title"`
+	Description string          `json:"description"`
+	StartDate   *time.Time      `json:"start_date,omitempty"`
+	EndDate     *time.Time      `json:"end_date,omitempty"`
+	Tasks       []iprTaskResponse `json:"tasks"`
+}
+
+type iprPlanResponse struct {
+	PlanID         string            `json:"plan_id"`
+	Title          string            `json:"title"`
+	EmployeeID     string            `json:"employee_id"`
+	MentorID       string            `json:"mentor_id"`
+	MentorName     string            `json:"mentor_name"`
+	StartDate      time.Time         `json:"start_date"`
+	EndDate        *time.Time        `json:"end_date,omitempty"`
+	Status         string            `json:"status"`
+	Progress       float64           `json:"progress"`
+	CompletedTasks int               `json:"completed_tasks"`
+	TotalTasks     int               `json:"total_tasks"`
+	Goals          []string          `json:"goals"`
+	Stages         []iprStageResponse `json:"stages"`
+}
+
+func (h *MotherHandler) handleIPR(w http.ResponseWriter, r *http.Request, matches []string) {
+	motherId, err := strconv.Atoi(matches[1])
+	if err != nil {
+		sendJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid id"})
+		return
+	}
+
+	plans, err := h.s.GetIPR(motherId)
+	if err != nil {
+		sendJSON(w, http.StatusInternalServerError, map[string]string{"error": "server error"})
+		return
+	}
+
+	result := make([]iprPlanResponse, len(plans))
+	for i, p := range plans {
+		var stages []iprStageResponse
+		for _, s := range p.Stages {
+			var tasks []iprTaskResponse
+			for _, t := range s.Tasks {
+				tasks = append(tasks, iprTaskResponse{
+					TaskID:          t.TaskID,
+					TaskType:        t.TaskType,
+					Title:           t.Title,
+					Description:     t.Description,
+					Status:          t.Status,
+					IsOverdue:       t.IsOverdue,
+					AbsoluteDueDate: t.AbsoluteDueDate,
+					CompletionDate:  t.CompletionDate,
+				})
+			}
+			stages = append(stages, iprStageResponse{
+				StageID:     s.StageID,
+				Title:       s.Title,
+				Description: s.Description,
+				StartDate:   s.StartDate,
+				EndDate:     s.EndDate,
+				Tasks:       tasks,
+			})
+		}
+		result[i] = iprPlanResponse{
+			PlanID:         p.PlanID,
+			Title:          p.Title,
+			EmployeeID:     p.EmployeeID,
+			MentorID:       p.MentorID,
+			MentorName:     p.MentorName,
+			StartDate:      p.StartDate,
+			EndDate:        p.EndDate,
+			Status:         p.Status,
+			Progress:       p.Progress,
+			CompletedTasks: p.CompletedTasks,
+			TotalTasks:     p.TotalTasks,
+			Goals:          p.Goals,
+			Stages:         stages,
 		}
 	}
 	sendJSON(w, http.StatusOK, result)

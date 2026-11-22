@@ -6,6 +6,7 @@ export interface AuthUser {
   first_name: string
   last_name: string
   role: string
+  mother_id: number
 }
 
 export interface LoginResponse {
@@ -15,6 +16,7 @@ export interface LoginResponse {
   first_name: string
   last_name: string
   role: string
+  mother_id: number
 }
 
 export interface CreateUserRequest {
@@ -23,6 +25,7 @@ export interface CreateUserRequest {
   first_name: string
   last_name: string
   role: string
+  mother_id?: number
 }
 
 export interface UserResponse {
@@ -31,6 +34,7 @@ export interface UserResponse {
   first_name: string
   last_name: string
   role: string
+  mother_id: number
   created_at: string
 }
 

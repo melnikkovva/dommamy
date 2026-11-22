@@ -17,8 +17,8 @@ func NewRepo(db *sql.DB) *Repo {
 
 func (r *Repo) Save(u *user.User) error {
 	res, err := r.db.Exec(
-		"INSERT INTO app_user (login, password, first_name, last_name, role, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-		u.Login, u.Password, u.FirstName, u.LastName, u.Role, u.CreatedAt,
+		"INSERT INTO app_user (login, password, first_name, last_name, role, mother_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+		u.Login, u.Password, u.FirstName, u.LastName, u.Role, u.MotherId, u.CreatedAt,
 	)
 	if err != nil {
 		return err
@@ -34,8 +34,8 @@ func (r *Repo) Save(u *user.User) error {
 func (r *Repo) UserById(id int) (*user.User, error) {
 	u := &user.User{}
 	err := r.db.QueryRow(
-		"SELECT id, login, password, first_name, last_name, role, created_at FROM app_user WHERE id = ?", id,
-	).Scan(&u.Id, &u.Login, &u.Password, &u.FirstName, &u.LastName, &u.Role, &u.CreatedAt)
+		"SELECT id, login, password, first_name, last_name, role, mother_id, created_at FROM app_user WHERE id = ?", id,
+	).Scan(&u.Id, &u.Login, &u.Password, &u.FirstName, &u.LastName, &u.Role, &u.MotherId, &u.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, user.ErrorNotFound
 	}
@@ -48,8 +48,8 @@ func (r *Repo) UserById(id int) (*user.User, error) {
 func (r *Repo) UserByLogin(login string) (*user.User, error) {
 	u := &user.User{}
 	err := r.db.QueryRow(
-		"SELECT id, login, password, first_name, last_name, role, created_at FROM app_user WHERE login = ?", login,
-	).Scan(&u.Id, &u.Login, &u.Password, &u.FirstName, &u.LastName, &u.Role, &u.CreatedAt)
+		"SELECT id, login, password, first_name, last_name, role, mother_id, created_at FROM app_user WHERE login = ?", login,
+	).Scan(&u.Id, &u.Login, &u.Password, &u.FirstName, &u.LastName, &u.Role, &u.MotherId, &u.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, user.ErrorNotFound
 	}
@@ -61,7 +61,7 @@ func (r *Repo) UserByLogin(login string) (*user.User, error) {
 
 func (r *Repo) ListUsers() ([]*user.User, error) {
 	rows, err := r.db.Query(
-		"SELECT id, login, password, first_name, last_name, role, created_at FROM app_user ORDER BY id",
+		"SELECT id, login, password, first_name, last_name, role, mother_id, created_at FROM app_user ORDER BY id",
 	)
 	if err != nil {
 		return nil, err
@@ -71,7 +71,7 @@ func (r *Repo) ListUsers() ([]*user.User, error) {
 	result := []*user.User{}
 	for rows.Next() {
 		u := &user.User{}
-		if err := rows.Scan(&u.Id, &u.Login, &u.Password, &u.FirstName, &u.LastName, &u.Role, &u.CreatedAt); err != nil {
+		if err := rows.Scan(&u.Id, &u.Login, &u.Password, &u.FirstName, &u.LastName, &u.Role, &u.MotherId, &u.CreatedAt); err != nil {
 			return nil, err
 		}
 		result = append(result, u)

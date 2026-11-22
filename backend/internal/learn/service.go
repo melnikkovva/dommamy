@@ -8,6 +8,7 @@ import (
 type Repository interface {
 	SaveLearners(learners []MotherLearnAccount) error
 	SaveCourseResults(results []CourseResult) error
+	SaveIPRPlans(plans []IPRPlan) error
 }
 
 type LearnerReader interface {
@@ -63,6 +64,17 @@ func (s *SyncService) SyncAll() error {
 		return err
 	}
 	log.Printf("Синхронизировано результатов обучения: %d", len(results))
+
+	iprPlans, err := s.api.FetchAllIPR()
+	if err != nil {
+		log.Printf("FetchAllIPR ошибка: %v", err)
+	} else {
+		if err := s.repo.SaveIPRPlans(iprPlans); err != nil {
+			log.Printf("SaveIPRPlans ошибка: %v", err)
+		} else {
+			log.Printf("Синхронизировано ИПР: %d", len(iprPlans))
+		}
+	}
 
 	log.Println("Синхронизация успешно завершена")
 	return nil

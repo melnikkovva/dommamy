@@ -54,7 +54,7 @@ export default function DonorPage() {
       <div className="page-head">
         <div>
           <h1>{donor.name}</h1>
-          <p className="muted"><Link to="/donors">Все дарители</Link> · {label(donorKindNames, donor.kind)}</p>
+          <p className="muted"><Link to="/donors">Все дарители</Link> {label(donorKindNames, donor.kind)}</p>
         </div>
         <div className="actions">
           <button className="btn" onClick={() => setEditing(true)}>Изменить</button>
@@ -63,7 +63,7 @@ export default function DonorPage() {
       </div>
       <div className="grid-2">
         <div className="card">
-          <h2>Пожертвования · {data.donations.length}</h2>
+          <h2>Пожертвования: {data.donations.length}</h2>
           <table>
             <thead><tr><th>Дата</th><th>Сумма</th><th>Комментарий</th></tr></thead>
             <tbody>

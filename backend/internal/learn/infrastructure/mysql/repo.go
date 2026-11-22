@@ -2,7 +2,9 @@ package mysql
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 
 	"backend/internal/learn"
@@ -217,4 +219,221 @@ func (r *Repo) GetCourseResults(learnUserID string) ([]learn.CourseResult, error
 	}
 
 	return results, rows.Err()
+}
+
+func (r *Repo) SaveIPRPlans(plans []learn.IPRPlan) error {
+	if len(plans) == 0 {
+		return nil
+	}
+
+	r.db.Exec("DELETE FROM lms_ipr_tasks")
+	r.db.Exec("DELETE FROM lms_ipr_stages")
+	r.db.Exec("DELETE FROM lms_ipr_plans")
+
+	planQuery := `
+		INSERT INTO lms_ipr_plans (
+			plan_id, title, employee_id, mentor_id, mentor_name,
+			start_date, end_date, status, progress, completed_tasks, total_tasks, goals
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`
+	stageQuery := `
+		INSERT INTO lms_ipr_stages (
+			plan_id, stage_id, title, description, start_date, end_date
+		) VALUES (?, ?, ?, ?, ?, ?)
+	`
+	taskQuery := `
+		INSERT INTO lms_ipr_tasks (
+			stage_id, task_id, task_type, title, description,
+			status, is_overdue, absolute_due_date, completion_date
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`
+
+	for _, p := range plans {
+		var endDate interface{}
+		if p.EndDate != nil {
+			endDate = *p.EndDate
+		}
+
+		goalsJSON, _ := json.Marshal(p.Goals)
+
+		_, err := r.db.Exec(planQuery,
+			p.PlanID, p.Title, p.EmployeeID, p.MentorID, p.MentorName,
+			p.StartDate, endDate, p.Status, p.Progress,
+			p.CompletedTasks, p.TotalTasks, string(goalsJSON),
+		)
+		if err != nil {
+			return fmt.Errorf("сохранение ИПР %s: %w", p.PlanID, err)
+		}
+
+		for _, s := range p.Stages {
+			var sStart, sEnd interface{}
+			if s.StartDate != nil {
+				sStart = *s.StartDate
+			}
+			if s.EndDate != nil {
+				sEnd = *s.EndDate
+			}
+
+			stageResult, err := r.db.Exec(stageQuery,
+				p.PlanID, s.StageID, s.Title, s.Description, sStart, sEnd,
+			)
+			if err != nil {
+				return fmt.Errorf("сохранение этапа %s: %w", s.StageID, err)
+			}
+			stageID, _ := stageResult.LastInsertId()
+
+			for _, t := range s.Tasks {
+				var dueDate, completionDate interface{}
+				if t.AbsoluteDueDate != nil {
+					dueDate = *t.AbsoluteDueDate
+				}
+				if t.CompletionDate != nil {
+					completionDate = *t.CompletionDate
+				}
+
+				_, err := r.db.Exec(taskQuery,
+					stageID, t.TaskID, t.TaskType, t.Title, t.Description,
+					t.Status, t.IsOverdue, dueDate, completionDate,
+				)
+				if err != nil {
+					return fmt.Errorf("сохранение задачи %s: %w", t.TaskID, err)
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func (r *Repo) GetIPRPlans(learnUserID string) ([]learn.IPRPlan, error) {
+	query := `
+		SELECT plan_id, title, employee_id, mentor_id, mentor_name,
+			start_date, end_date, status, progress, completed_tasks, total_tasks, goals
+		FROM lms_ipr_plans
+		WHERE employee_id = ?
+		ORDER BY start_date DESC
+	`
+
+	rows, err := r.db.Query(query, learnUserID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var plans []learn.IPRPlan
+	for rows.Next() {
+		var p learn.IPRPlan
+		var endDate sql.NullTime
+		var goalsJSON sql.NullString
+
+		err := rows.Scan(
+			&p.PlanID, &p.Title, &p.EmployeeID, &p.MentorID, &p.MentorName,
+			&p.StartDate, &endDate, &p.Status, &p.Progress,
+			&p.CompletedTasks, &p.TotalTasks, &goalsJSON,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		if endDate.Valid {
+			t := endDate.Time
+			p.EndDate = &t
+		}
+		if goalsJSON.Valid {
+			json.Unmarshal([]byte(goalsJSON.String), &p.Goals)
+		}
+
+		stages, err := r.getIPRStages(p.PlanID)
+		if err != nil {
+			return nil, err
+		}
+		p.Stages = stages
+
+		plans = append(plans, p)
+	}
+	return plans, rows.Err()
+}
+
+func (r *Repo) getIPRStages(planID string) ([]learn.IPRStage, error) {
+	query := `
+		SELECT id, stage_id, title, description, start_date, end_date
+		FROM lms_ipr_stages
+		WHERE plan_id = ?
+		ORDER BY start_date ASC
+	`
+
+	rows, err := r.db.Query(query, planID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var stages []learn.IPRStage
+	for rows.Next() {
+		var s learn.IPRStage
+		var stageDBID int64
+		var sStart, sEnd sql.NullTime
+
+		err := rows.Scan(&stageDBID, &s.StageID, &s.Title, &s.Description, &sStart, &sEnd)
+		if err != nil {
+			return nil, err
+		}
+
+		if sStart.Valid {
+			t := sStart.Time
+			s.StartDate = &t
+		}
+		if sEnd.Valid {
+			t := sEnd.Time
+			s.EndDate = &t
+		}
+
+		tasks, err := r.getIPRTasks(stageDBID)
+		if err != nil {
+			return nil, err
+		}
+		s.Tasks = tasks
+
+		stages = append(stages, s)
+	}
+	return stages, rows.Err()
+}
+
+func (r *Repo) getIPRTasks(stageID int64) ([]learn.IPRTask, error) {
+	query := `
+		SELECT task_id, task_type, title, description,
+			status, is_overdue, absolute_due_date, completion_date
+		FROM lms_ipr_tasks
+		WHERE stage_id = ?
+		ORDER BY absolute_due_date ASC
+	`
+
+	rows, err := r.db.Query(query, stageID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var tasks []learn.IPRTask
+	for rows.Next() {
+		var t learn.IPRTask
+		var dueDate, completionDate sql.NullTime
+
+		err := rows.Scan(&t.TaskID, &t.TaskType, &t.Title, &t.Description,
+			&t.Status, &t.IsOverdue, &dueDate, &completionDate)
+		if err != nil {
+			return nil, err
+		}
+
+		if dueDate.Valid {
+			d := dueDate.Time
+			t.AbsoluteDueDate = &d
+		}
+		if completionDate.Valid {
+			d := completionDate.Time
+			t.CompletionDate = &d
+		}
+
+		tasks = append(tasks, t)
+	}
+	return tasks, rows.Err()
 }

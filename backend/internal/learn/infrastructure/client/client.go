@@ -1,6 +1,7 @@
 package client
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -297,4 +298,223 @@ func (c *Client) FetchAllCourseResults() ([]learn.CourseResult, error) {
 	}
 
 	return allResults, nil
+}
+
+func (c *Client) FetchAllIPR() ([]learn.IPRPlan, error) {
+	var allPlans []learn.IPRPlan
+	pageToken := ""
+
+	for {
+		bodyBytes := []byte(`{"pageSize": 100}`)
+		if pageToken != "" {
+			bodyBytes = []byte(fmt.Sprintf(`{"pageSize": 100, "pageToken": "%s"}`, pageToken))
+		}
+
+		apiURL := fmt.Sprintf("%s/api/v3/developmentplan/v1/enrolled-plans", c.baseURL)
+
+		req, err := http.NewRequest("POST", apiURL, bytes.NewReader(bodyBytes))
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := c.doRequest(req)
+		if err != nil {
+			return nil, err
+		}
+
+		body, err := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if err != nil {
+			return nil, err
+		}
+
+		var apiResp struct {
+			Items         []struct{ PlanID string `json:"id"` } `json:"items"`
+			NextPageToken string                                `json:"nextPageToken"`
+		}
+
+		if err := json.Unmarshal(body, &apiResp); err != nil {
+			return nil, fmt.Errorf("разбор списка ИПР: %w (ответ: %s)", err, string(body)[:min(len(body), 500)])
+		}
+
+		var planIDs []string
+		for _, item := range apiResp.Items {
+			planIDs = append(planIDs, item.PlanID)
+		}
+
+		if apiResp.NextPageToken == "" && len(planIDs) > 0 {
+			plans, err := c.fetchIPRDetails(planIDs)
+			if err != nil {
+				return nil, err
+			}
+			allPlans = append(allPlans, plans...)
+			break
+		}
+
+		if len(planIDs) > 0 {
+			plans, err := c.fetchIPRDetails(planIDs)
+			if err != nil {
+				return nil, err
+			}
+			allPlans = append(allPlans, plans...)
+		}
+
+		if apiResp.NextPageToken == "" {
+			break
+		}
+		pageToken = apiResp.NextPageToken
+	}
+
+	return allPlans, nil
+}
+
+func (c *Client) fetchIPRDetails(planIDs []string) ([]learn.IPRPlan, error) {
+	if len(planIDs) == 0 {
+		return nil, nil
+	}
+
+	idsJSON, _ := json.Marshal(planIDs)
+	bodyStr := fmt.Sprintf(`{"ids": %s}`, string(idsJSON))
+
+	apiURL := fmt.Sprintf("%s/api/v3/developmentplan/v1/enrolled-plans/detailed", c.baseURL)
+
+	req, err := http.NewRequest("POST", apiURL, bytes.NewReader([]byte(bodyStr)))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.doRequest(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	var apiResp struct {
+		Items []struct {
+			PlanID       string   `json:"id"`
+			Title        string   `json:"title"`
+			EmployeeID   string   `json:"employeeId"`
+			MentorID     string   `json:"mentorId"`
+			MentorName   string   `json:"mentorName"`
+			StartDate    string   `json:"startDate"`
+			EndDate      *string  `json:"endDate"`
+			Status       string   `json:"status"`
+			Progress     float64  `json:"progress"`
+			CompletedTasks int    `json:"completedTasksCount"`
+			TotalTasks   int      `json:"totalTasksCount"`
+			Goals        []string `json:"goals"`
+			Stages       []struct {
+				StageID     string   `json:"id"`
+				Title       string   `json:"title"`
+				Description string   `json:"description"`
+				StartDate   *string  `json:"startDate"`
+				EndDate     *string  `json:"endDate"`
+				Tasks       []struct {
+					TaskData struct {
+						TaskID string `json:"id"`
+						Type   string `json:"type"`
+						TextTask struct {
+							Title       string `json:"title"`
+							Description string `json:"description"`
+						} `json:"textTask"`
+					} `json:"taskData"`
+					Status          string  `json:"status"`
+					IsOverdue       bool    `json:"isOverdue"`
+					AbsoluteDueDate *string `json:"absoluteDueDate"`
+					CompletionDate  *string `json:"completionDate"`
+				} `json:"tasks"`
+			} `json:"stages"`
+		} `json:"items"`
+	}
+
+	if err := json.Unmarshal(body, &apiResp); err != nil {
+		return nil, fmt.Errorf("разбор деталей ИПР: %w (ответ: %s)", err, string(body)[:min(len(body), 500)])
+	}
+
+	var plans []learn.IPRPlan
+	for _, item := range apiResp.Items {
+		startDate, _ := time.Parse("2006-01-02", item.StartDate)
+
+		var endDate *time.Time
+		if item.EndDate != nil && *item.EndDate != "" {
+			t, _ := time.Parse("2006-01-02", *item.EndDate)
+			endDate = &t
+		}
+
+		var stages []learn.IPRStage
+		for _, s := range item.Stages {
+			var sStart, sEnd *time.Time
+			if s.StartDate != nil && *s.StartDate != "" {
+				t, _ := time.Parse("2006-01-02", *s.StartDate)
+				sStart = &t
+			}
+			if s.EndDate != nil && *s.EndDate != "" {
+				t, _ := time.Parse("2006-01-02", *s.EndDate)
+				sEnd = &t
+			}
+
+			var tasks []learn.IPRTask
+			for _, t := range s.Tasks {
+				var dueDate, completionDate *time.Time
+				if t.AbsoluteDueDate != nil && *t.AbsoluteDueDate != "" {
+					d, _ := time.Parse("2006-01-02", *t.AbsoluteDueDate)
+					dueDate = &d
+				}
+				if t.CompletionDate != nil && *t.CompletionDate != "" {
+					d, _ := time.Parse("2006-01-02", *t.CompletionDate)
+					completionDate = &d
+				}
+
+				title := t.TaskData.TextTask.Title
+				if title == "" {
+					title = t.TaskData.Type
+				}
+
+				tasks = append(tasks, learn.IPRTask{
+					TaskID:          t.TaskData.TaskID,
+					TaskType:        t.TaskData.Type,
+					Title:           title,
+					Description:     t.TaskData.TextTask.Description,
+					Status:          t.Status,
+					IsOverdue:       t.IsOverdue,
+					AbsoluteDueDate: dueDate,
+					CompletionDate:  completionDate,
+				})
+			}
+
+			stages = append(stages, learn.IPRStage{
+				StageID:     s.StageID,
+				Title:       s.Title,
+				Description: s.Description,
+				StartDate:   sStart,
+				EndDate:     sEnd,
+				Tasks:       tasks,
+			})
+		}
+
+		plans = append(plans, learn.IPRPlan{
+			PlanID:         item.PlanID,
+			Title:          item.Title,
+			EmployeeID:     item.EmployeeID,
+			MentorID:       item.MentorID,
+			MentorName:     item.MentorName,
+			StartDate:      startDate,
+			EndDate:        endDate,
+			Status:         item.Status,
+			Progress:       item.Progress,
+			CompletedTasks: item.CompletedTasks,
+			TotalTasks:     item.TotalTasks,
+			Goals:          item.Goals,
+			Stages:         stages,
+		})
+	}
+
+	return plans, nil
 }

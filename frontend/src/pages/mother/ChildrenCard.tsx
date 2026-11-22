@@ -38,7 +38,7 @@ export default function ChildrenCard({ motherId, items, onChanged }: { motherId:
           {items.map((c) => (
             <tr key={c.id}>
               <td><strong>{c.first_name}</strong></td>
-              <td>{fmtDate(c.birth_date)} · {yearsText(ageYears(c.birth_date))}</td>
+              <td>{fmtDate(c.birth_date)}  {yearsText(ageYears(c.birth_date))}</td>
             </tr>
           ))}
           {items.length === 0 && <tr><td colSpan={2} className="muted">Детей пока нет</td></tr>}

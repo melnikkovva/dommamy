@@ -11,6 +11,7 @@ import HelpTab from './mother/HelpTab'
 import EventsTab from './mother/EventsTab'
 import RequestsTab from './mother/RequestsTab'
 import CoursesTab from './mother/CoursesTab'
+import IprTab from './mother/IprTab'
 import { ageYears, fmtDate, fullName, yearsText } from '../utils/format'
 
 const tabs: [string, string][] = [
@@ -19,6 +20,7 @@ const tabs: [string, string][] = [
   ['help', 'История помощи'],
   ['events', 'Мероприятия'],
   ['courses', 'Курсы'],
+  ['ipr', 'ИПР'],
   ['requests', 'Заметки']
 ]
 
@@ -38,7 +40,7 @@ export default function MotherPage() {
     return <div className="card">Такой мамы нет. <Link to="/mothers">К списку</Link></div>
   }
   const initials = ((mother.last_name[0] || '') + (mother.first_name[0] || '')).toUpperCase()
-  const childrenText = data.children.map((c) => c.first_name + ', ' + yearsText(ageYears(c.birth_date))).join(' · ')
+  const childrenText = data.children.map((c) => c.first_name + ', ' + yearsText(ageYears(c.birth_date))).join(' . ')
   const hasPhoto = !!mother.photo_url
 
   async function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -92,6 +94,7 @@ export default function MotherPage() {
       {tab === 'help' && <HelpTab motherId={id} />}
       {tab === 'events' && <EventsTab motherId={id} />}
       {tab === 'courses' && <CoursesTab motherId={id} />}
+      {tab === 'ipr' && <IprTab motherId={id} />}
       {tab === 'requests' && <RequestsTab motherId={id} />}
       {viewPhoto && (
         <div className="modal-backdrop" onClick={() => setViewPhoto(null)}>

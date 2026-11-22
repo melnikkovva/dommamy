@@ -71,7 +71,7 @@ export default function HelpPage() {
             <Field label="Мама *">
               <select value={currentMother} onChange={(e) => { setMotherId(e.target.value); setRequestId('') }} required>
                 {data.mothers.map((m) => (
-                  <option key={m.id} value={m.id}>{fullName(m)} · № {m.id}</option>
+                  <option key={m.id} value={m.id}>{fullName(m)} </option>
                 ))}
               </select>
             </Field>
@@ -92,7 +92,7 @@ export default function HelpPage() {
               <select value={chosenRequest ? requestId : ''} onChange={(e) => setRequestId(e.target.value)}>
                 <option value="">Без заявки</option>
                 {openRequests.map((r) => (
-                  <option key={r.id} value={r.id}>№ {r.id} · {label(kindNames, r.kind)} · {r.description.slice(0, 40)}</option>
+                  <option key={r.id} value={r.id}>№ {r.id}  {label(kindNames, r.kind)} {r.description.slice(0, 40)}</option>
                 ))}
               </select>
             </Field>

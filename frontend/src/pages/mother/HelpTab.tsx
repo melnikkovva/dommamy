@@ -12,7 +12,7 @@ export default function HelpTab({ motherId }: { motherId: number }) {
   if (!data) return <LoadState error={error} />
   return (
     <div className="card">
-      <h2>История помощи · {data.length}</h2>
+      <h2>История помощи  {data.length}</h2>
       <table>
         <thead><tr><th>№</th><th>Дата</th><th>Вид</th><th>Объём</th><th>Чек</th></tr></thead>
         <tbody>

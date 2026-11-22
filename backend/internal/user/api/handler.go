@@ -39,6 +39,7 @@ type loginResponse struct {
 	FirstName   string `json:"first_name"`
 	LastName    string `json:"last_name"`
 	Role        string `json:"role"`
+	MotherId    int    `json:"mother_id"`
 }
 
 type userResponse struct {
@@ -47,6 +48,7 @@ type userResponse struct {
 	FirstName string `json:"first_name"`
 	LastName  string `json:"last_name"`
 	Role      string `json:"role"`
+	MotherId  int    `json:"mother_id"`
 	CreatedAt string `json:"created_at"`
 }
 
@@ -56,12 +58,13 @@ type createUserBody struct {
 	FirstName string `json:"first_name"`
 	LastName  string `json:"last_name"`
 	Role      string `json:"role"`
+	MotherId  int    `json:"mother_id"`
 }
 
 func toUserResponse(u *user.User) userResponse {
 	return userResponse{
 		Id: u.Id, Login: u.Login, FirstName: u.FirstName, LastName: u.LastName,
-		Role: u.Role, CreatedAt: u.CreatedAt.Format(time.RFC3339),
+		Role: u.Role, MotherId: u.MotherId, CreatedAt: u.CreatedAt.Format(time.RFC3339),
 	}
 }
 
@@ -89,6 +92,7 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 		FirstName: u.FirstName,
 		LastName:  u.LastName,
 		Role:      u.Role,
+		MotherId:  u.MotherId,
 	})
 }
 
@@ -105,7 +109,7 @@ func (h *Handler) createUser(w http.ResponseWriter, r *http.Request) {
 	if req.Role == "" {
 		req.Role = user.RoleUser
 	}
-	u, err := h.s.Create(req.Login, req.Password, req.FirstName, req.LastName, req.Role)
+	u, err := h.s.Create(req.Login, req.Password, req.FirstName, req.LastName, req.Role, req.MotherId)
 	if err != nil {
 		switch {
 		case errors.Is(err, user.ErrorLoginTaken):

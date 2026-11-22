@@ -1,10 +1,13 @@
 import { useState } from 'react'
 import { useLoad } from '../hooks/useLoad'
 import { listUsers, createUser, UserResponse } from '../api/auth'
+import { getMothers } from '../api/mothers'
 import { errorText } from '../api/client'
+import type { Mother } from '../types'
 
 export default function UsersPage() {
   const { data: users, error, reload } = useLoad(listUsers, [])
+  const { data: mothers } = useLoad(getMothers, [])
   const [showForm, setShowForm] = useState(false)
   const [formError, setFormError] = useState('')
   const [formLoading, setFormLoading] = useState(false)
@@ -14,6 +17,7 @@ export default function UsersPage() {
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [role, setRole] = useState('user')
+  const [motherId, setMotherId] = useState<number>(0)
 
   const resetForm = () => {
     setLogin('')
@@ -21,6 +25,7 @@ export default function UsersPage() {
     setFirstName('')
     setLastName('')
     setRole('user')
+    setMotherId(0)
     setFormError('')
   }
 
@@ -29,7 +34,7 @@ export default function UsersPage() {
     setFormError('')
     setFormLoading(true)
     try {
-      await createUser({ login, password, first_name: firstName, last_name: lastName, role })
+      await createUser({ login, password, first_name: firstName, last_name: lastName, role, mother_id: motherId || undefined })
       resetForm()
       setShowForm(false)
       await reload()
@@ -81,8 +86,20 @@ export default function UsersPage() {
               <select value={role} onChange={(e) => setRole(e.target.value)}>
                 <option value="user">Пользователь</option>
                 <option value="admin">Администратор</option>
+                <option value="mom">Мама</option>
               </select>
             </div>
+            {role === 'mom' && mothers && (
+              <div className="form-row">
+                <label>Подопечная</label>
+                <select value={motherId} onChange={(e) => setMotherId(Number(e.target.value))}>
+                  <option value={0}>Выберите подопечную</option>
+                  {mothers.map((m: Mother) => (
+                    <option key={m.id} value={m.id}>{m.last_name} {m.first_name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
 
           <div className="dialog-buttons">
@@ -113,9 +130,8 @@ export default function UsersPage() {
                   <td>{u.first_name}</td>
                   <td>{u.last_name}</td>
                   <td>
-                    <span className={`badge ${u.role === 'admin' ? 'badge-ok' : 'badge-muted'}`}>
-                      {u.role === 'admin' ? 'Админ' : 'Пользователь'}
-                    </span>
+                    {u.role === 'admin' ? 'Админ' : u.role === 'mom' ? 'Мама' : 'Пользователь'}
+                    {u.mother_id > 0 && u.role === 'mom' && <span className="muted" style={{ marginLeft: 6 }}>#{u.mother_id}</span>}
                   </td>
                   <td>{new Date(u.created_at).toLocaleDateString('ru-RU')}</td>
                 </tr>

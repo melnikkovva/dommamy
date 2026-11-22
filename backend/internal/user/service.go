@@ -29,8 +29,7 @@ func NewService(repo Repository, secret string, tokenTTL time.Duration) *Service
 	}
 }
 
-func (s *Service) Create(login, password, firstName, lastName, role string) (*User, error) {
-	// check unique login
+func (s *Service) Create(login, password, firstName, lastName, role string, motherId int) (*User, error) {
 	if _, err := s.repo.UserByLogin(login); err == nil {
 		return nil, ErrorLoginTaken
 	}
@@ -46,6 +45,7 @@ func (s *Service) Create(login, password, firstName, lastName, role string) (*Us
 		FirstName: firstName,
 		LastName:  lastName,
 		Role:      role,
+		MotherId:  motherId,
 		CreatedAt: time.Now(),
 	}
 	if err := u.Validate(); err != nil {

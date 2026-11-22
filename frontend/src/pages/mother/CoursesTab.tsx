@@ -20,7 +20,7 @@ function CourseCard({ course }: { course: CourseItem }) {
         </span>
       </div>
 
-      <p className="muted">Learn · Старт {fmtDate(course.access_date)}</p>
+      <p className="muted"> Старт {fmtDate(course.access_date)}</p>
 
       <div className="progress-section">
         <span className="progress-label">Прогресс обучения</span>
@@ -33,8 +33,8 @@ function CourseCard({ course }: { course: CourseItem }) {
       <div className="course-results">
         <span className="field-label">Результаты</span>
         {isCompleted
-          ? <p>{course.views_count} из {course.views_count} уроков · Итоговый тест: {course.awarded_score ?? '—'}</p>
-          : <p>Пройдено {lessonsCompleted} из {lessonsTotal || '?'} уроков · Тесты: {course.awarded_score ?? '—'}</p>
+          ? <p>{course.views_count} из {course.views_count} уроков Итоговый тест: {course.awarded_score ?? '—'}</p>
+          : <p>Пройдено {lessonsCompleted} из {lessonsTotal || '?'} уроков  Тесты: {course.awarded_score ?? '—'}</p>
         }
       </div>
 
@@ -42,13 +42,13 @@ function CourseCard({ course }: { course: CourseItem }) {
         <span className="field-label">Дата завершения</span>
         {isCompleted
           ? <p>{fmtDate(course.completion_date || '')}</p>
-          : <p>Ещё не завершён · План: {fmtDate(course.due_date || '')}</p>
+          : <p>Ещё не завершён  План: {fmtDate(course.due_date || '')}</p>
         }
       </div>
 
       <div className="course-actions">
         {isCompleted
-          ? <button className="btn btn-small">📄 Сертификат.pdf</button>
+          ? <button className="btn btn-small">Сертификат.pdf</button>
           : <button className="btn btn-small">Обновить сведения</button>
         }
       </div>

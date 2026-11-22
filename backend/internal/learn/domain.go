@@ -61,10 +61,52 @@ type LearnAccountRepository interface  {
 type LearnApiClient interface {
 	FetchAllLearnAccounts() ([]MotherLearnAccount, error)
 	FetchAllCourseResults() ([]CourseResult, error)
+	FetchAllIPR() ([]IPRPlan, error)
 }
 
 type StatsRepository interface {
 	GetCourseStats(learnUserID string) (*CourseStats, error)
 	GetCourseResults(learnUserID string) ([]CourseResult, error)
+}
+
+type IPRPlan struct {
+	PlanID        string
+	Title         string
+	EmployeeID    string
+	MentorID      string
+	MentorName    string
+	StartDate     time.Time
+	EndDate       *time.Time
+	Status        string
+	Progress      float64
+	CompletedTasks int
+	TotalTasks    int
+	Goals         []string
+	Stages        []IPRStage
+}
+
+type IPRStage struct {
+	StageID   string
+	Title     string
+	Description string
+	StartDate *time.Time
+	EndDate   *time.Time
+	Tasks     []IPRTask
+}
+
+type IPRTask struct {
+	TaskID          string
+	TaskType        string
+	Title           string
+	Description     string
+	Status          string
+	IsOverdue       bool
+	AbsoluteDueDate *time.Time
+	CompletionDate  *time.Time
+}
+
+type IPRRepository interface {
+	SaveIPRPlans(plans []IPRPlan) error
+	GetIPRPlans(learnUserID string) ([]IPRPlan, error)
 }
 

@@ -15,12 +15,17 @@ import ReportsPage from './pages/ReportsPage'
 import UsersPage from './pages/UsersPage'
 import LoginPage from './pages/LoginPage'
 import NotFoundPage from './pages/NotFoundPage'
+import MomDashboard from './pages/mom/MomDashboard'
 
 function ProtectedRoute({ children }: { children: JSX.Element }) {
   const { user } = useAuth()
   if (!user) {
     const to: NavigateOptions = { replace: true }
     return <Navigate to="/login" {...to} />
+  }
+  if (user.role === 'mom') {
+    const to: NavigateOptions = { replace: true }
+    return <Navigate to="/mom" {...to} />
   }
   return children
 }
@@ -34,12 +39,22 @@ function AdminRoute({ children }: { children: JSX.Element }) {
   return children
 }
 
+function MomRoute({ children }: { children: JSX.Element }) {
+  const { isMom } = useAuth()
+  if (!isMom) {
+    const to: NavigateOptions = { replace: true }
+    return <Navigate to="/" {...to} />
+  }
+  return children
+}
+
 export default function App() {
   return (
     <AuthProvider>
       <ToastProvider>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/mom" element={<MomRoute><MomDashboard /></MomRoute>} />
           <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
             <Route path="/" element={<HomePage />} />
             <Route path="/mothers" element={<MothersPage />} />

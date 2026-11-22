@@ -17,6 +17,7 @@ var ErrorLoginTaken = errors.New("login is already taken")
 const (
 	RoleAdmin = "admin"
 	RoleUser  = "user"
+	RoleMom   = "mom"
 )
 
 type User struct {
@@ -26,6 +27,7 @@ type User struct {
 	FirstName string
 	LastName  string
 	Role      string
+	MotherId  int 
 	CreatedAt time.Time
 }
 
@@ -45,7 +47,7 @@ func (u *User) Validate() error {
 	if u.LastName == "" {
 		return ErrorSurname
 	}
-	if u.Role != RoleAdmin && u.Role != RoleUser {
+	if u.Role != RoleAdmin && u.Role != RoleUser && u.Role != RoleMom {
 		u.Role = RoleUser
 	}
 	return nil

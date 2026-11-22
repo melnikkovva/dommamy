@@ -78,7 +78,7 @@ export default function HomePage() {
               <tbody>
                 {data.requests.slice(0, 5).map((r) => (
                   <tr key={r.id}>
-                    <td><strong>{names[r.mother_id] || 'Мама № ' + r.mother_id}</strong> · {label(kindNames, r.kind)}</td>
+                    <td><strong>{names[r.mother_id] || 'Мама № ' + r.mother_id}</strong>  {label(kindNames, r.kind)}</td>
                     <td>{fmtDate(r.created_at)}</td>
                     <td><RequestBadge status={r.status} /></td>
                   </tr>

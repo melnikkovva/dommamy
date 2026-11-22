@@ -9,6 +9,7 @@ import (
 type LearnStatsRepository interface {
 	GetCourseStats(learnUserID string) (*learn.CourseStats, error)
 	GetCourseResults(learnUserID string) ([]learn.CourseResult, error)
+	GetIPRPlans(learnUserID string) ([]learn.IPRPlan, error)
 }
 
 type Service struct {
@@ -91,6 +92,17 @@ func (s *Service) GetCourses(motherId int) ([]learn.CourseResult, error) {
 		return []learn.CourseResult{}, nil
 	}
 	return s.learnStatsRepo.GetCourseResults(m.LearnUserID)
+}
+
+func (s *Service) GetIPR(motherId int) ([]learn.IPRPlan, error) {
+	m, err := s.repo.ById(motherId)
+	if err != nil {
+		return nil, err
+	}
+	if m.LearnUserID == "" || s.learnStatsRepo == nil {
+		return []learn.IPRPlan{}, nil
+	}
+	return s.learnStatsRepo.GetIPRPlans(m.LearnUserID)
 }
 
 func (s *Service) UpdatePhotoURL(id int, photoURL string) error {

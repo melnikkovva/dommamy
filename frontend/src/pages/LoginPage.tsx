@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
 export default function LoginPage() {
-  const { login } = useAuth()
+  const { login, user } = useAuth()
   const navigate = useNavigate()
   const [loginValue, setLoginValue] = useState('')
   const [password, setPassword] = useState('')
@@ -19,7 +19,11 @@ export default function LoginPage() {
       if (err) {
         setError(err)
       } else {
-        navigate('/')
+        if (user?.role === 'mom') {
+          navigate('/mom')
+        } else {
+          navigate('/')
+        }
       }
     } finally {
       setLoading(false)
