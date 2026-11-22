@@ -2,7 +2,6 @@ package api
 
 import (
 	"encoding/csv"
-	"encoding/json"
 	"errors"
 	"log"
 	"net/http"
@@ -10,6 +9,7 @@ import (
 	"time"
 
 	"backend/internal/report"
+	"backend/internal/shared/httpx"
 )
 
 type Handler struct {
@@ -53,7 +53,7 @@ func (h *Handler) get(w http.ResponseWriter, r *http.Request) {
 	for _, t := range rep.Totals {
 		totals = append(totals, totalResponse{Label: t.Label, Value: t.Value})
 	}
-	writeJSON(w, http.StatusOK, reportResponse{Name: rep.Name, Title: rep.Title, Headers: rep.Headers, Rows: rep.Rows, Totals: totals})
+	httpx.WriteJSON(w, http.StatusOK, reportResponse{Name: rep.Name, Title: rep.Title, Headers: rep.Headers, Rows: rep.Rows, Totals: totals})
 }
 
 func (h *Handler) download(w http.ResponseWriter, r *http.Request) {
@@ -105,17 +105,11 @@ func looksLikePhone(s string) bool {
 func fail(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, report.ErrorUnknown):
-		writeJSON(w, http.StatusNotFound, map[string]string{"error": err.Error()})
+		httpx.WriteJSON(w, http.StatusNotFound, map[string]string{"error": err.Error()})
 	case errors.Is(err, report.ErrorPeriod):
-		writeJSON(w, http.StatusUnprocessableEntity, map[string]string{"error": err.Error()})
+		httpx.WriteJSON(w, http.StatusUnprocessableEntity, map[string]string{"error": err.Error()})
 	default:
 		log.Println("error report:", err)
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "something went wrong"})
+		httpx.WriteJSON(w, http.StatusInternalServerError, map[string]string{"error": "something went wrong"})
 	}
-}
-
-func writeJSON(w http.ResponseWriter, status int, data any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(data)
 }

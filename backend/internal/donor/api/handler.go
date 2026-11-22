@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"backend/internal/donor"
+	"backend/internal/shared/httpx"
 )
 
 type Handler struct {
@@ -59,6 +60,11 @@ type donationResponse struct {
 	Comment string `json:"comment"`
 }
 
+type donorGetResponse struct {
+	Donor donorResponse `json:"donor"`
+	Donations []donationResponse `json:"donations"`
+}
+
 func toDonor(d *donor.Donor) donorResponse {
 	return donorResponse{
 		Id: d.Id, Name: d.Name, Kind: d.Kind, Phone: d.Phone, Email: d.Email,
@@ -73,7 +79,7 @@ func toDonation(n *donor.Donation) donationResponse {
 func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 	var req donorBody
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect JSON"})
+		httpx.WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect JSON"})
 		return
 	}
 	d, err := h.s.Create(req.Name, req.Kind, req.Phone, req.Email, req.Comment)
@@ -81,7 +87,7 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 		fail(w, "create donor", err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, toDonor(d))
+	httpx.WriteJSON(w, http.StatusCreated, toDonor(d))
 }
 
 func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
@@ -94,13 +100,13 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 	for _, s := range items {
 		result = append(result, summaryResponse{donorResponse: toDonor(&s.Donor), Total: s.Total, Count: s.Count})
 	}
-	writeJSON(w, http.StatusOK, result)
+	httpx.WriteJSON(w, http.StatusOK, result)
 }
 
 func (h *Handler) get(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect id"})
+		httpx.WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect id"})
 		return
 	}
 	d, donations, err := h.s.Get(id)
@@ -112,18 +118,18 @@ func (h *Handler) get(w http.ResponseWriter, r *http.Request) {
 	for _, n := range donations {
 		list = append(list, toDonation(n))
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"donor": toDonor(d), "donations": list})
+	httpx.WriteJSON(w, http.StatusOK, donorGetResponse{Donor: toDonor(d), Donations: list})
 }
 
 func (h *Handler) update(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect id"})
+		httpx.WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect id"})
 		return
 	}
 	var req donorBody
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect JSON"})
+		httpx.WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect JSON"})
 		return
 	}
 	d, err := h.s.Update(id, req.Name, req.Kind, req.Phone, req.Email, req.Comment)
@@ -131,13 +137,13 @@ func (h *Handler) update(w http.ResponseWriter, r *http.Request) {
 		fail(w, "update donor", err)
 		return
 	}
-	writeJSON(w, http.StatusOK, toDonor(d))
+	httpx.WriteJSON(w, http.StatusOK, toDonor(d))
 }
 
 func (h *Handler) addDonation(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect id"})
+		httpx.WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect id"})
 		return
 	}
 	var req struct {
@@ -146,7 +152,7 @@ func (h *Handler) addDonation(w http.ResponseWriter, r *http.Request) {
 		Comment string `json:"comment"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect JSON"})
+		httpx.WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect JSON"})
 		return
 	}
 	n, err := h.s.AddDonation(id, req.Amount, req.Date, req.Comment)
@@ -154,25 +160,19 @@ func (h *Handler) addDonation(w http.ResponseWriter, r *http.Request) {
 		fail(w, "add donation", err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, toDonation(n))
+	httpx.WriteJSON(w, http.StatusCreated, toDonation(n))
 }
 
 func fail(w http.ResponseWriter, where string, err error) {
 	switch {
 	case errors.Is(err, donor.ErrorNotFound):
-		writeJSON(w, http.StatusNotFound, map[string]string{"error": err.Error()})
+		httpx.WriteJSON(w, http.StatusNotFound, map[string]string{"error": err.Error()})
 	case errors.Is(err, donor.ErrorName), errors.Is(err, donor.ErrorKind),
 		errors.Is(err, donor.ErrorEmail), errors.Is(err, donor.ErrorAmount),
 		errors.Is(err, donor.ErrorDate):
-		writeJSON(w, http.StatusUnprocessableEntity, map[string]string{"error": err.Error()})
+		httpx.WriteJSON(w, http.StatusUnprocessableEntity, map[string]string{"error": err.Error()})
 	default:
 		log.Println("error", where+":", err)
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "something went wrong"})
+		httpx.WriteJSON(w, http.StatusInternalServerError, map[string]string{"error": "something went wrong"})
 	}
-}
-
-func writeJSON(w http.ResponseWriter, status int, data any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(data)
 }

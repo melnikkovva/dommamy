@@ -85,17 +85,18 @@ func (r *Repo) SaveCourseResults(results []learn.CourseResult) error {
 	`
 
 	for _, res := range results {
-		var dueDate, completionDate interface{}
+		var dueDate sql.NullTime
 		if res.DueDate != nil {
-			dueDate = *res.DueDate
+			dueDate = sql.NullTime{Time: *res.DueDate, Valid: true}
 		}
+		var completionDate sql.NullTime
 		if res.CompletionDate != nil {
-			completionDate = *res.CompletionDate
+			completionDate = sql.NullTime{Time: *res.CompletionDate, Valid: true}
 		}
 
-		var awardedScore interface{}
+		var awardedScore sql.NullFloat64
 		if res.AwardedScore != nil {
-			awardedScore = *res.AwardedScore
+			awardedScore = sql.NullFloat64{Float64: *res.AwardedScore, Valid: true}
 		}
 
 		_, err := r.db.Exec(query,
@@ -249,9 +250,9 @@ func (r *Repo) SaveIPRPlans(plans []learn.IPRPlan) error {
 	`
 
 	for _, p := range plans {
-		var endDate interface{}
+		var endDate sql.NullTime
 		if p.EndDate != nil {
-			endDate = *p.EndDate
+			endDate = sql.NullTime{Time: *p.EndDate, Valid: true}
 		}
 
 		goalsJSON, _ := json.Marshal(p.Goals)
@@ -266,12 +267,13 @@ func (r *Repo) SaveIPRPlans(plans []learn.IPRPlan) error {
 		}
 
 		for _, s := range p.Stages {
-			var sStart, sEnd interface{}
+			var sStart sql.NullTime
 			if s.StartDate != nil {
-				sStart = *s.StartDate
+				sStart = sql.NullTime{Time: *s.StartDate, Valid: true}
 			}
+			var sEnd sql.NullTime
 			if s.EndDate != nil {
-				sEnd = *s.EndDate
+				sEnd = sql.NullTime{Time: *s.EndDate, Valid: true}
 			}
 
 			stageResult, err := r.db.Exec(stageQuery,
@@ -283,12 +285,13 @@ func (r *Repo) SaveIPRPlans(plans []learn.IPRPlan) error {
 			stageID, _ := stageResult.LastInsertId()
 
 			for _, t := range s.Tasks {
-				var dueDate, completionDate interface{}
+				var dueDate sql.NullTime
 				if t.AbsoluteDueDate != nil {
-					dueDate = *t.AbsoluteDueDate
+					dueDate = sql.NullTime{Time: *t.AbsoluteDueDate, Valid: true}
 				}
+				var completionDate sql.NullTime
 				if t.CompletionDate != nil {
-					completionDate = *t.CompletionDate
+					completionDate = sql.NullTime{Time: *t.CompletionDate, Valid: true}
 				}
 
 				_, err := r.db.Exec(taskQuery,

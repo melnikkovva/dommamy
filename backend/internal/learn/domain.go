@@ -1,11 +1,8 @@
 package learn
 
 import (
-	"errors"
 	"time"
 )
-
-var ErrInvalidData = errors.New("invalid learn data")
 
 type MotherLearnAccount struct {
 	UserId        string 

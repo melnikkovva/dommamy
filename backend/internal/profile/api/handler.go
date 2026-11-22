@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"backend/internal/profile"
+	"backend/internal/shared/httpx"
 )
 
 type Handler struct {
@@ -53,6 +54,12 @@ type profileResponse struct {
 	UpdatedAt string `json:"updated_at"`
 }
 
+type profileListItem struct {
+	MotherId int `json:"mother_id"`
+	Status string `json:"status"`
+	UpdatedAt string `json:"updated_at"`
+}
+
 func toResponse(p *profile.Profile) profileResponse {
 	updated := ""
 	if !p.UpdatedAt.IsZero() {
@@ -75,7 +82,7 @@ func toResponse(p *profile.Profile) profileResponse {
 func (h *Handler) get(w http.ResponseWriter, r *http.Request) {
 	motherId, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect id"})
+		httpx.WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect id"})
 		return
 	}
 	p, err := h.s.Get(motherId)
@@ -83,18 +90,18 @@ func (h *Handler) get(w http.ResponseWriter, r *http.Request) {
 		fail(w, "get profile", err)
 		return
 	}
-	writeJSON(w, http.StatusOK, toResponse(p))
+	httpx.WriteJSON(w, http.StatusOK, toResponse(p))
 }
 
 func (h *Handler) save(w http.ResponseWriter, r *http.Request) {
 	motherId, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect id"})
+		httpx.WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect id"})
 		return
 	}
 	var req profileBody
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect JSON"})
+		httpx.WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect JSON"})
 		return
 	}
 	p := &profile.Profile{
@@ -110,27 +117,27 @@ func (h *Handler) save(w http.ResponseWriter, r *http.Request) {
 		fail(w, "save profile", err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	httpx.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 func (h *Handler) setStatus(w http.ResponseWriter, r *http.Request) {
 	motherId, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect id"})
+		httpx.WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect id"})
 		return
 	}
 	var req struct {
 		Status string `json:"status"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect JSON"})
+		httpx.WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect JSON"})
 		return
 	}
 	if err := h.s.SetStatus(motherId, req.Status); err != nil {
 		fail(w, "set profile status", err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	httpx.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
@@ -139,15 +146,15 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 		fail(w, "list profiles", err)
 		return
 	}
-	result := []map[string]any{}
+	result := []profileListItem{}
 	for _, p := range items {
-		result = append(result, map[string]any{
-			"mother_id": p.MotherId,
-			"status": p.Status,
-			"updated_at": p.UpdatedAt.Format(time.RFC3339),
+		result = append(result, profileListItem{
+			MotherId: p.MotherId,
+			Status: p.Status,
+			UpdatedAt: p.UpdatedAt.Format(time.RFC3339),
 		})
 	}
-	writeJSON(w, http.StatusOK, result)
+	httpx.WriteJSON(w, http.StatusOK, result)
 }
 
 func fail(w http.ResponseWriter, where string, err error) {
@@ -157,15 +164,9 @@ func fail(w http.ResponseWriter, where string, err error) {
 		errors.Is(err, profile.ErrorWeeks), errors.Is(err, profile.ErrorStatus),
 		errors.Is(err, profile.ErrorTransition), errors.Is(err, profile.ErrorNotFilled),
 		errors.Is(err, profile.ErrorNotComplete):
-		writeJSON(w, http.StatusUnprocessableEntity, map[string]string{"error": err.Error()})
+		httpx.WriteJSON(w, http.StatusUnprocessableEntity, map[string]string{"error": err.Error()})
 	default:
 		log.Println("error", where+":", err)
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "something went wrong"})
+		httpx.WriteJSON(w, http.StatusInternalServerError, map[string]string{"error": "something went wrong"})
 	}
-}
-
-func writeJSON(w http.ResponseWriter, status int, data any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(data)
 }

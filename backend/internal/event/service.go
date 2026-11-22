@@ -1,6 +1,9 @@
 package event
 
-import "time"
+import (
+	"errors"
+	"time"
+)
 
 type Repository interface {
 	Types() ([]*Type, error)
@@ -62,6 +65,9 @@ func (s *Service) Register(eventId, motherId int) error {
 	}
 	p, err := s.repo.Participation(eventId, motherId)
 	if err != nil {
+		if errors.Is(err, ErrorNotRegistered) {
+			return nil
+		}
 		return err
 	}
 	if p != nil {

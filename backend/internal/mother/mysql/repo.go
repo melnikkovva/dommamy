@@ -16,13 +16,13 @@ func NewRepo(db *sql.DB) *Repo {
 }
 
 func (r *Repo) Save(m *mother.Mother) error {
-	var learnUserID interface{}
+	var learnUserID sql.NullString
 	if m.LearnUserID != "" {
-		learnUserID = m.LearnUserID
+		learnUserID = sql.NullString{String: m.LearnUserID, Valid: true}
 	}
-	var photoURL interface{}
+	var photoURL sql.NullString
 	if m.PhotoURL != "" {
-		photoURL = m.PhotoURL
+		photoURL = sql.NullString{String: m.PhotoURL, Valid: true}
 	}
 	res, err := r.db.Exec(
 		`INSERT INTO mother (first_name, last_name, phone, email, learn_user_id, photo_url, created_at)

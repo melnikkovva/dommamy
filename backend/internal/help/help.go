@@ -1,7 +1,6 @@
 package help
 
 import (
-	"errors"
 	"time"
 )
 
@@ -15,12 +14,6 @@ const (
 func (h Kind) RequireCheck() bool {
 	return h == Food
 }
-
-var ErrorCheck = errors.New("Need check for food")
-var ErrorSum = errors.New("Incorrect sum")
-var ErrorMum = errors.New("Incorrect mum")
-var ErrorKind = errors.New("Unknown kind of help")
-var ErrorNotFound = errors.New("help not found")
 
 type Item struct {
 	Id int

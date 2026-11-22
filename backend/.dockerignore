@@ -1,0 +1,5 @@
+.git
+uploads
+*.code-workspace
+Dockerfile
+.dockerignore

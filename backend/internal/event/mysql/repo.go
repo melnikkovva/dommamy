@@ -104,7 +104,7 @@ func (r *Repo) Participation(eventId, motherId int) (*event.Participation, error
 		eventId, motherId,
 	).Scan(&p.EventId, &p.MotherId, &p.Status)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil
+		return nil, event.ErrorNotRegistered
 	}
 	if err != nil {
 		return nil, err

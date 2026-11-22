@@ -9,10 +9,27 @@ import (
 	"time"
 
 	"backend/internal/lifecycle"
+	"backend/internal/shared/httpx"
 )
 
 type Handler struct {
 	s *lifecycle.Service
+}
+
+type lifecycleHistoryItem struct {
+	Status string `json:"status"`
+	Reason string `json:"reason"`
+	CreatedAt string `json:"created_at"`
+}
+
+type lifecycleStatusResponse struct {
+	Status string `json:"status"`
+	History []lifecycleHistoryItem `json:"history"`
+}
+
+type lifecycleCurrentItem struct {
+	MotherId int `json:"mother_id"`
+	Status string `json:"status"`
 }
 
 func New(s *lifecycle.Service) *Handler {
@@ -28,7 +45,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 func (h *Handler) get(w http.ResponseWriter, r *http.Request) {
 	motherId, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect id"})
+		httpx.WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect id"})
 		return
 	}
 	current, err := h.s.Status(motherId)
@@ -41,21 +58,21 @@ func (h *Handler) get(w http.ResponseWriter, r *http.Request) {
 		fail(w, "history", err)
 		return
 	}
-	history := []map[string]string{}
+	history := []lifecycleHistoryItem{}
 	for _, c := range items {
-		history = append(history, map[string]string{
-			"status": c.Status,
-			"reason": c.Reason,
-			"created_at": c.CreatedAt.Format(time.RFC3339),
+		history = append(history, lifecycleHistoryItem{
+			Status: c.Status,
+			Reason: c.Reason,
+			CreatedAt: c.CreatedAt.Format(time.RFC3339),
 		})
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"status": current, "history": history})
+	httpx.WriteJSON(w, http.StatusOK, lifecycleStatusResponse{Status: current, History: history})
 }
 
 func (h *Handler) change(w http.ResponseWriter, r *http.Request) {
 	motherId, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect id"})
+		httpx.WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect id"})
 		return
 	}
 	var req struct {
@@ -63,14 +80,14 @@ func (h *Handler) change(w http.ResponseWriter, r *http.Request) {
 		Reason string `json:"reason"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect JSON"})
+		httpx.WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect JSON"})
 		return
 	}
 	if err := h.s.Change(motherId, req.Status, req.Reason); err != nil {
 		fail(w, "change status", err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	httpx.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 func (h *Handler) all(w http.ResponseWriter, r *http.Request) {
@@ -79,11 +96,11 @@ func (h *Handler) all(w http.ResponseWriter, r *http.Request) {
 		fail(w, "currents", err)
 		return
 	}
-	result := []map[string]any{}
+	result := []lifecycleCurrentItem{}
 	for _, c := range items {
-		result = append(result, map[string]any{"mother_id": c.MotherId, "status": c.Status})
+		result = append(result, lifecycleCurrentItem{MotherId: c.MotherId, Status: c.Status})
 	}
-	writeJSON(w, http.StatusOK, result)
+	httpx.WriteJSON(w, http.StatusOK, result)
 }
 
 func fail(w http.ResponseWriter, where string, err error) {
@@ -91,15 +108,9 @@ func fail(w http.ResponseWriter, where string, err error) {
 	case errors.Is(err, lifecycle.ErrorMother), errors.Is(err, lifecycle.ErrorNoMother),
 		errors.Is(err, lifecycle.ErrorStatus), errors.Is(err, lifecycle.ErrorTransition),
 		errors.Is(err, lifecycle.ErrorReason):
-		writeJSON(w, http.StatusUnprocessableEntity, map[string]string{"error": err.Error()})
+		httpx.WriteJSON(w, http.StatusUnprocessableEntity, map[string]string{"error": err.Error()})
 	default:
 		log.Println("error", where+":", err)
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "something went wrong"})
+		httpx.WriteJSON(w, http.StatusInternalServerError, map[string]string{"error": "something went wrong"})
 	}
-}
-
-func writeJSON(w http.ResponseWriter, status int, data any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(data)
 }

@@ -1,15 +1,11 @@
 package mother
 
 import (
-	"errors"
 	"time"
 	"strings"
 
 	"backend/internal/learn"
 )
-
-var ErrorName = errors.New("need name and surname")
-var ErrorNotFound = errors.New("mother not found")
 
 type Mother struct {
 	Id int

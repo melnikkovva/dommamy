@@ -1,12 +1,13 @@
 FROM golang:1.26-alpine AS builder
-WORKDIR /app
+WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
-COPY . .
-RUN CGO_ENABLED=0 go build -o server .
+COPY cmd ./cmd
+COPY internal ./internal
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/server ./cmd/server
 
-FROM alpine:3.20
-WORKDIR /app
-COPY --from=builder /app/server .
+FROM gcr.io/distroless/static-debian12:nonroot
+COPY --from=builder /out/server /server
+ENV FILES_DIR=/data/uploads
 EXPOSE 8080
-CMD ["./server"]
+ENTRYPOINT ["/server"]

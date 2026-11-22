@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"backend/internal/request"
+	"backend/internal/shared/httpx"
 )
 
 type Handler struct {
@@ -63,7 +64,7 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 		Description string `json:"description"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect JSON"})
+		httpx.WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect JSON"})
 		return
 	}
 	created, err := h.s.Create(req.MotherId, req.Kind, req.Description, request.SourceStaff)
@@ -71,7 +72,7 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 		fail(w, "create request", err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, toResponse(created))
+	httpx.WriteJSON(w, http.StatusCreated, toResponse(created))
 }
 
 func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
@@ -80,13 +81,13 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 		fail(w, "list requests", err)
 		return
 	}
-	writeJSON(w, http.StatusOK, toResponses(items))
+	httpx.WriteJSON(w, http.StatusOK, toResponses(items))
 }
 
 func (h *Handler) byMother(w http.ResponseWriter, r *http.Request) {
 	motherId, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect id"})
+		httpx.WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect id"})
 		return
 	}
 	items, err := h.s.ByMother(motherId)
@@ -94,13 +95,13 @@ func (h *Handler) byMother(w http.ResponseWriter, r *http.Request) {
 		fail(w, "requests by mother", err)
 		return
 	}
-	writeJSON(w, http.StatusOK, toResponses(items))
+	httpx.WriteJSON(w, http.StatusOK, toResponses(items))
 }
 
 func (h *Handler) setStatus(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect id"})
+		httpx.WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect id"})
 		return
 	}
 	var req struct {
@@ -108,7 +109,7 @@ func (h *Handler) setStatus(w http.ResponseWriter, r *http.Request) {
 		Comment string `json:"comment"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect JSON"})
+		httpx.WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect JSON"})
 		return
 	}
 	updated, err := h.s.SetStatus(id, req.Status, req.Comment)
@@ -116,20 +117,20 @@ func (h *Handler) setStatus(w http.ResponseWriter, r *http.Request) {
 		fail(w, "set request status", err)
 		return
 	}
-	writeJSON(w, http.StatusOK, toResponse(updated))
+	httpx.WriteJSON(w, http.StatusOK, toResponse(updated))
 }
 
 func (h *Handler) issue(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect id"})
+		httpx.WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect id"})
 		return
 	}
 	var req struct {
 		HelpId int `json:"help_id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect JSON"})
+		httpx.WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect JSON"})
 		return
 	}
 	updated, err := h.s.Fulfill(id, req.HelpId)
@@ -137,27 +138,21 @@ func (h *Handler) issue(w http.ResponseWriter, r *http.Request) {
 		fail(w, "fulfill request", err)
 		return
 	}
-	writeJSON(w, http.StatusOK, toResponse(updated))
+	httpx.WriteJSON(w, http.StatusOK, toResponse(updated))
 }
 
 func fail(w http.ResponseWriter, where string, err error) {
 	switch {
 	case errors.Is(err, request.ErrorNotFound):
-		writeJSON(w, http.StatusNotFound, map[string]string{"error": err.Error()})
+		httpx.WriteJSON(w, http.StatusNotFound, map[string]string{"error": err.Error()})
 	case errors.Is(err, request.ErrorMother), errors.Is(err, request.ErrorNoMother),
 		errors.Is(err, request.ErrorKind), errors.Is(err, request.ErrorSource),
 		errors.Is(err, request.ErrorStatus), errors.Is(err, request.ErrorTransition),
 		errors.Is(err, request.ErrorComment), errors.Is(err, request.ErrorUseIssue),
 		errors.Is(err, request.ErrorNoHelp), errors.Is(err, request.ErrorHelpMismatch):
-		writeJSON(w, http.StatusUnprocessableEntity, map[string]string{"error": err.Error()})
+		httpx.WriteJSON(w, http.StatusUnprocessableEntity, map[string]string{"error": err.Error()})
 	default:
 		log.Println("error", where+":", err)
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "something went wrong"})
+		httpx.WriteJSON(w, http.StatusInternalServerError, map[string]string{"error": "something went wrong"})
 	}
-}
-
-func writeJSON(w http.ResponseWriter, status int, data any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(data)
 }

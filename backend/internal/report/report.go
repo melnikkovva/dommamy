@@ -1,12 +1,8 @@
 package report
 
 import (
-	"errors"
 	"time"
 )
-
-var ErrorPeriod = errors.New("the period is incorrect")
-var ErrorUnknown = errors.New("unknown report")
 
 var kindNames = map[string]string{"food": "Продукты", "clothes": "Вещи", "furniture": "Мебель", "other": "Другое"}
 var eventStatusNames = map[string]string{"registered": "Записана", "came": "Пришла", "absent": "Не пришла"}

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"backend/internal/event"
+	"backend/internal/shared/httpx"
 )
 
 type Handler struct {
@@ -52,34 +53,44 @@ func toResponse(e *event.Event) eventResponse {
 	}
 }
 
+type eventTypeResponse struct {
+	Id int `json:"id"`
+	Name string `json:"name"`
+}
+
+type participationResponse struct {
+	MotherId int `json:"mother_id"`
+	Status event.ParticipationStatus `json:"status"`
+}
+
 func (h *Handler) types(w http.ResponseWriter, r *http.Request) {
 	items, err := h.s.Types()
 	if err != nil {
 		return
 	}
-	result := []map[string]any{}
+	result := []eventTypeResponse{}
 	for _, t := range items {
-		result = append(result, map[string]any{"id": t.Id, "name": t.Name})
+		result = append(result, eventTypeResponse{Id: t.Id, Name: t.Name})
 	}
-	writeJSON(w, http.StatusOK, result)
+	httpx.WriteJSON(w, http.StatusOK, result)
 }
 
 func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 	var req eventRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect JSON"})
+		httpx.WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect JSON"})
 		return
 	}
 	startsAt, err := time.Parse("2006-01-02T15:04", req.StartsAt)
 	if err != nil {
-		writeJSON(w, http.StatusUnprocessableEntity, map[string]string{"error": "specify the date and time"})
+		httpx.WriteJSON(w, http.StatusUnprocessableEntity, map[string]string{"error": "specify the date and time"})
 		return
 	}
 	e, err := h.s.Create(req.TypeId, req.Title, startsAt, req.Place, req.MaxPeople)
 	if err != nil {
 		return
 	}
-	writeJSON(w, http.StatusCreated, toResponse(e))
+	httpx.WriteJSON(w, http.StatusCreated, toResponse(e))
 }
 
 func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
@@ -87,20 +98,20 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		return
 	}
-	writeJSON(w, http.StatusOK, toResponses(items))
+	httpx.WriteJSON(w, http.StatusOK, toResponses(items))
 }
 
 func (h *Handler) byMother(w http.ResponseWriter, r *http.Request) {
 	motherId, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect id"})
+		httpx.WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect id"})
 		return
 	}
 	items, err := h.s.ByMother(motherId)
 	if err != nil {
 		return
 	}
-	writeJSON(w, http.StatusOK, toResponses(items))
+	httpx.WriteJSON(w, http.StatusOK, toResponses(items))
 }
 
 func toResponses(items []*event.Event) []eventResponse {
@@ -114,61 +125,55 @@ func toResponses(items []*event.Event) []eventResponse {
 func (h *Handler) register(w http.ResponseWriter, r *http.Request) {
 	eventId, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect id"})
+		httpx.WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect id"})
 		return
 	}
 	var req struct {
 		MotherId int `json:"mother_id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect JSON"})
+		httpx.WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect JSON"})
 		return
 	}
 	if err := h.s.Register(eventId, req.MotherId); err != nil {
 		return
 	}
-	writeJSON(w, http.StatusCreated, map[string]string{"status": "ok"})
+	httpx.WriteJSON(w, http.StatusCreated, map[string]string{"status": "ok"})
 }
 
 func (h *Handler) participants(w http.ResponseWriter, r *http.Request) {
 	eventId, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect id"})
+		httpx.WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect id"})
 		return
 	}
 	items, err := h.s.Participants(eventId)
 	if err != nil {
 		return
 	}
-	result := []map[string]any{}
+	result := []participationResponse{}
 	for _, p := range items {
-		result = append(result, map[string]any{"mother_id": p.MotherId, "status": p.Status})
+		result = append(result, participationResponse{MotherId: p.MotherId, Status: p.Status})
 	}
-	writeJSON(w, http.StatusOK, result)
+	httpx.WriteJSON(w, http.StatusOK, result)
 }
 
 func (h *Handler) mark(w http.ResponseWriter, r *http.Request) {
 	eventId, err1 := strconv.Atoi(r.PathValue("id"))
 	motherId, err2 := strconv.Atoi(r.PathValue("motherId"))
 	if err1 != nil || err2 != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect id"})
+		httpx.WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect id"})
 		return
 	}
 	var req struct {
 		Status string `json:"status"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect JSON"})
+		httpx.WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect JSON"})
 		return
 	}
 	if err := h.s.Mark(eventId, motherId, req.Status); err != nil {
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
-}
-
-func writeJSON(w http.ResponseWriter, status int, data any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(data)
+	httpx.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }

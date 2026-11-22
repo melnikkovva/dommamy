@@ -38,7 +38,7 @@ func (r *Repo) Current(motherId int) (*lifecycle.Change, error) {
 		 WHERE mother_id = ? ORDER BY id DESC LIMIT 1`, motherId,
 	).Scan(&c.Id, &c.MotherId, &c.Status, &c.Reason, &c.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil
+		return nil, lifecycle.ErrorNoMother
 	}
 	if err != nil {
 		return nil, err

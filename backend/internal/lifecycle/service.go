@@ -1,5 +1,7 @@
 package lifecycle
 
+import "errors"
+
 type Repository interface {
 	Add(c *Change) error
 	Current(motherId int) (*Change, error)  
@@ -23,10 +25,10 @@ func NewService(repo Repository, mothers MotherChecker) *Service {
 func (s *Service) Status(motherId int) (string, error) {
 	c, err := s.repo.Current(motherId)
 	if err != nil {
+		if errors.Is(err, ErrorNoMother) {
+			return StatusReview, nil
+		}
 		return "", err
-	}
-	if c == nil {
-		return StatusReview, nil
 	}
 	return c.Status, nil
 }
