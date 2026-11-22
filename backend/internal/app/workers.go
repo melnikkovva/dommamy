@@ -5,17 +5,18 @@ import (
 	"log"
 	"time"
 
-	"backend/internal/learn"
+	learncommand "backend/internal/learn/application/command"
 )
 
 type LearnSyncWorker struct {
-	sync       *learn.SyncService
+	sync       *learncommand.SyncHandler
+	link       *learncommand.LinkUsersHandler
 	apiEnabled bool
 	interval   time.Duration
 }
 
-func NewLearnSyncWorker(s *learn.SyncService, apiEnabled bool, interval time.Duration) *LearnSyncWorker {
-	return &LearnSyncWorker{sync: s, apiEnabled: apiEnabled, interval: interval}
+func NewLearnSyncWorker(sync *learncommand.SyncHandler, link *learncommand.LinkUsersHandler, apiEnabled bool, interval time.Duration) *LearnSyncWorker {
+	return &LearnSyncWorker{sync: sync, link: link, apiEnabled: apiEnabled, interval: interval}
 }
 
 func (w *LearnSyncWorker) Run(ctx context.Context) {
@@ -23,7 +24,7 @@ func (w *LearnSyncWorker) Run(ctx context.Context) {
 	defer ticker.Stop()
 
 	for {
-		w.tick()
+		w.tick(ctx)
 		select {
 		case <-ctx.Done():
 			return
@@ -32,13 +33,13 @@ func (w *LearnSyncWorker) Run(ctx context.Context) {
 	}
 }
 
-func (w *LearnSyncWorker) tick() {
+func (w *LearnSyncWorker) tick(ctx context.Context) {
 	if w.apiEnabled {
-		if err := w.sync.SyncAll(); err != nil {
+		if err := w.sync.SyncAll(ctx); err != nil {
 			log.Printf("SyncAll ошибка: %v", err)
 		}
 	}
-	if err := w.sync.SyncUsers(); err != nil {
-		log.Printf("SyncUsers ошибка: %v", err)
+	if err := w.link.LinkUsers(ctx); err != nil {
+		log.Printf("LinkUsers ошибка: %v", err)
 	}
 }

@@ -1,14 +1,14 @@
 package adapter
 
-type MotherService interface {
+type MotherChecker interface {
 	Exists(id int) (bool, error)
 }
 
 type MotherDirectory struct {
-	mothers MotherService
+	mothers MotherChecker
 }
 
-func NewMotherDirectory(mothers MotherService) *MotherDirectory {
+func NewMotherDirectory(mothers MotherChecker) *MotherDirectory {
 	return &MotherDirectory{mothers: mothers}
 }
 

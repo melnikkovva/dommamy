@@ -2,6 +2,7 @@ package client
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"backend/internal/learn"
+	"backend/internal/learn/domain"
 )
 
 type Client struct {
@@ -72,7 +73,7 @@ func (c *Client) getToken() (string, error) {
 	c.accessToken = tokenResp.AccessToken
 	expiresIn := time.Duration(tokenResp.ExpiresIn) * time.Second
 	if expiresIn == 0 {
-		expiresIn = 30 * time.Minute 
+		expiresIn = 30 * time.Minute
 	}
 	c.tokenExpiry = time.Now().Add(expiresIn - 5*time.Minute)
 
@@ -110,8 +111,8 @@ func (c *Client) doRequest(req *http.Request) (*http.Response, error) {
 	return resp, err
 }
 
-func (c *Client) FetchAllLearnAccounts() ([]learn.MotherLearnAccount, error) {
-	var allLearnAccounts []learn.MotherLearnAccount
+func (c *Client) FetchAllLearnAccounts(ctx context.Context) ([]domain.MotherLearnAccount, error) {
+	var allLearnAccounts []domain.MotherLearnAccount
 	pageToken := ""
 
 	for {
@@ -123,7 +124,7 @@ func (c *Client) FetchAllLearnAccounts() ([]learn.MotherLearnAccount, error) {
 
 		apiURL := fmt.Sprintf("%s/users?%s", c.baseURL, params.Encode())
 
-		req, err := http.NewRequest("GET", apiURL, nil)
+		req, err := http.NewRequestWithContext(ctx, "GET", apiURL, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -159,7 +160,7 @@ func (c *Client) FetchAllLearnAccounts() ([]learn.MotherLearnAccount, error) {
 		}
 
 		for _, p := range apiResp.UserProfiles {
- 		getField := func(name string) string {
+			getField := func(name string) string {
 				for _, f := range p.Fields {
 					if f.Name == name {
 						return f.Value
@@ -171,18 +172,18 @@ func (c *Client) FetchAllLearnAccounts() ([]learn.MotherLearnAccount, error) {
 			addedDate, _ := time.Parse("2006-01-02", p.AddedDate)
 			lastLoginDate, _ := time.Parse("2006-01-02", p.LastLoginDate)
 
- 		allLearnAccounts = append(allLearnAccounts, learn.MotherLearnAccount{
- 			UserId:        p.UserID,
- 			DepartmentId:  p.DepartmentID,
- 			FirstName:     getField("FIRST_NAME"),
- 			LastName:      getField("LAST_NAME"),
- 			Email:         getField("EMAIL"),
- 			Login:         getField("LOGIN"),
- 			Phone:         getField("PHONE"),
- 			Status:        fmt.Sprintf("%d", p.Status),
- 			AddedDate:     addedDate,
- 			LastLoginDate: lastLoginDate,
- 		})
+			allLearnAccounts = append(allLearnAccounts, domain.MotherLearnAccount{
+				UserId:        p.UserID,
+				DepartmentId:  p.DepartmentID,
+				FirstName:     getField("FIRST_NAME"),
+				LastName:      getField("LAST_NAME"),
+				Email:         getField("EMAIL"),
+				Login:         getField("LOGIN"),
+				Phone:         getField("PHONE"),
+				Status:        fmt.Sprintf("%d", p.Status),
+				AddedDate:     addedDate,
+				LastLoginDate: lastLoginDate,
+			})
 		}
 
 		if apiResp.NextPageToken == "" {
@@ -194,8 +195,8 @@ func (c *Client) FetchAllLearnAccounts() ([]learn.MotherLearnAccount, error) {
 	return allLearnAccounts, nil
 }
 
-func (c *Client) FetchAllCourseResults() ([]learn.CourseResult, error) {
-	var allResults []learn.CourseResult
+func (c *Client) FetchAllCourseResults(ctx context.Context) ([]domain.CourseResult, error) {
+	var allResults []domain.CourseResult
 	pageToken := ""
 
 	for {
@@ -209,7 +210,7 @@ func (c *Client) FetchAllCourseResults() ([]learn.CourseResult, error) {
 
 		apiURL := fmt.Sprintf("%s/learners/results?%s", c.baseURL, params.Encode())
 
-		req, err := http.NewRequest("GET", apiURL, nil)
+		req, err := http.NewRequestWithContext(ctx, "GET", apiURL, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -239,7 +240,7 @@ func (c *Client) FetchAllCourseResults() ([]learn.CourseResult, error) {
 				CompletionStatus string      `json:"completionStatuses"`
 				Progress         float64     `json:"progress"`
 				AwardedScore     *float64    `json:"awardedScore"`
-				IsOverdue        interface{} `json:"isOverdue"` 
+				IsOverdue        interface{} `json:"isOverdue"`
 				ViewsCount       int         `json:"viewsCount"`
 			} `json:"results"`
 			NextPageToken string `json:"nextPageToken"`
@@ -251,7 +252,7 @@ func (c *Client) FetchAllCourseResults() ([]learn.CourseResult, error) {
 
 		for _, r := range apiResp.Results {
 			accessDate, _ := time.Parse(time.RFC3339, r.AccessDate)
-			
+
 			var dueDate *time.Time
 			if r.DueDate != "" {
 				t, _ := time.Parse(time.RFC3339, r.DueDate)
@@ -274,7 +275,7 @@ func (c *Client) FetchAllCourseResults() ([]learn.CourseResult, error) {
 				isOverdue = v == "1" || v == "true"
 			}
 
-			allResults = append(allResults, learn.CourseResult{
+			allResults = append(allResults, domain.CourseResult{
 				UserId:           r.UserID,
 				CourseId:         r.CourseID,
 				NameCourse:       r.CourseTitle,
@@ -300,8 +301,8 @@ func (c *Client) FetchAllCourseResults() ([]learn.CourseResult, error) {
 	return allResults, nil
 }
 
-func (c *Client) FetchAllIPR() ([]learn.IPRPlan, error) {
-	var allPlans []learn.IPRPlan
+func (c *Client) FetchAllIPR(ctx context.Context) ([]domain.IPRPlan, error) {
+	var allPlans []domain.IPRPlan
 	pageToken := ""
 
 	for {
@@ -312,7 +313,7 @@ func (c *Client) FetchAllIPR() ([]learn.IPRPlan, error) {
 
 		apiURL := fmt.Sprintf("%s/api/v3/developmentplan/v1/enrolled-plans", c.baseURL)
 
-		req, err := http.NewRequest("POST", apiURL, bytes.NewReader(bodyBytes))
+		req, err := http.NewRequestWithContext(ctx, "POST", apiURL, bytes.NewReader(bodyBytes))
 		if err != nil {
 			return nil, err
 		}
@@ -344,7 +345,7 @@ func (c *Client) FetchAllIPR() ([]learn.IPRPlan, error) {
 		}
 
 		if apiResp.NextPageToken == "" && len(planIDs) > 0 {
-			plans, err := c.fetchIPRDetails(planIDs)
+			plans, err := c.fetchIPRDetails(ctx, planIDs)
 			if err != nil {
 				return nil, err
 			}
@@ -353,7 +354,7 @@ func (c *Client) FetchAllIPR() ([]learn.IPRPlan, error) {
 		}
 
 		if len(planIDs) > 0 {
-			plans, err := c.fetchIPRDetails(planIDs)
+			plans, err := c.fetchIPRDetails(ctx, planIDs)
 			if err != nil {
 				return nil, err
 			}
@@ -369,7 +370,7 @@ func (c *Client) FetchAllIPR() ([]learn.IPRPlan, error) {
 	return allPlans, nil
 }
 
-func (c *Client) fetchIPRDetails(planIDs []string) ([]learn.IPRPlan, error) {
+func (c *Client) fetchIPRDetails(ctx context.Context, planIDs []string) ([]domain.IPRPlan, error) {
 	if len(planIDs) == 0 {
 		return nil, nil
 	}
@@ -379,7 +380,7 @@ func (c *Client) fetchIPRDetails(planIDs []string) ([]learn.IPRPlan, error) {
 
 	apiURL := fmt.Sprintf("%s/api/v3/developmentplan/v1/enrolled-plans/detailed", c.baseURL)
 
-	req, err := http.NewRequest("POST", apiURL, bytes.NewReader([]byte(bodyStr)))
+	req, err := http.NewRequestWithContext(ctx, "POST", apiURL, bytes.NewReader([]byte(bodyStr)))
 	if err != nil {
 		return nil, err
 	}
@@ -438,7 +439,7 @@ func (c *Client) fetchIPRDetails(planIDs []string) ([]learn.IPRPlan, error) {
 		return nil, fmt.Errorf("разбор деталей ИПР: %w (ответ: %s)", err, string(body)[:min(len(body), 500)])
 	}
 
-	var plans []learn.IPRPlan
+	var plans []domain.IPRPlan
 	for _, item := range apiResp.Items {
 		startDate, _ := time.Parse("2006-01-02", item.StartDate)
 
@@ -448,7 +449,7 @@ func (c *Client) fetchIPRDetails(planIDs []string) ([]learn.IPRPlan, error) {
 			endDate = &t
 		}
 
-		var stages []learn.IPRStage
+		var stages []domain.IPRStage
 		for _, s := range item.Stages {
 			var sStart, sEnd *time.Time
 			if s.StartDate != nil && *s.StartDate != "" {
@@ -460,7 +461,7 @@ func (c *Client) fetchIPRDetails(planIDs []string) ([]learn.IPRPlan, error) {
 				sEnd = &t
 			}
 
-			var tasks []learn.IPRTask
+			var tasks []domain.IPRTask
 			for _, t := range s.Tasks {
 				var dueDate, completionDate *time.Time
 				if t.AbsoluteDueDate != nil && *t.AbsoluteDueDate != "" {
@@ -477,7 +478,7 @@ func (c *Client) fetchIPRDetails(planIDs []string) ([]learn.IPRPlan, error) {
 					title = t.TaskData.Type
 				}
 
-				tasks = append(tasks, learn.IPRTask{
+				tasks = append(tasks, domain.IPRTask{
 					TaskID:          t.TaskData.TaskID,
 					TaskType:        t.TaskData.Type,
 					Title:           title,
@@ -489,7 +490,7 @@ func (c *Client) fetchIPRDetails(planIDs []string) ([]learn.IPRPlan, error) {
 				})
 			}
 
-			stages = append(stages, learn.IPRStage{
+			stages = append(stages, domain.IPRStage{
 				StageID:     s.StageID,
 				Title:       s.Title,
 				Description: s.Description,
@@ -499,7 +500,7 @@ func (c *Client) fetchIPRDetails(planIDs []string) ([]learn.IPRPlan, error) {
 			})
 		}
 
-		plans = append(plans, learn.IPRPlan{
+		plans = append(plans, domain.IPRPlan{
 			PlanID:         item.PlanID,
 			Title:          item.Title,
 			EmployeeID:     item.EmployeeID,

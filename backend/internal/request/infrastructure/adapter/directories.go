@@ -5,19 +5,16 @@ import (
 	"errors"
 
 	"backend/internal/help"
-	"backend/internal/mother"
 	"backend/internal/request/application/command"
 	"backend/internal/request/domain"
 )
 
-func NewMotherDirectory(s *mother.Service) command.MotherDirectory {
-	return &motherDirectory{s: s}
+type MotherChecker interface {
+	Exists(ctx context.Context, id int) (bool, error)
 }
 
-type motherDirectory struct{ s *mother.Service }
-
-func (d *motherDirectory) Exists(_ context.Context, id int) (bool, error) {
-	return d.s.Exists(id)
+func NewMotherDirectory(checker MotherChecker) command.MotherDirectory {
+	return checker
 }
 
 func NewHelpDirectory(s *help.Service) command.HelpDirectory {

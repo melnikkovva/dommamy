@@ -1,19 +1,19 @@
 package adapter
 
-import (
-	"context"
+import "context"
 
-	"backend/internal/mother"
-)
+type MotherChecker interface {
+	Exists(ctx context.Context, id int) (bool, error)
+}
 
 type MotherDirectory struct {
-	service *mother.Service
+	checker MotherChecker
 }
 
-func NewMotherDirectory(service *mother.Service) *MotherDirectory {
-	return &MotherDirectory{service: service}
+func NewMotherDirectory(checker MotherChecker) *MotherDirectory {
+	return &MotherDirectory{checker: checker}
 }
 
-func (a *MotherDirectory) Exists(ctx context.Context, id int) (bool, error) {
-	return a.service.Exists(id)
+func (m *MotherDirectory) Exists(ctx context.Context, id int) (bool, error) {
+	return m.checker.Exists(ctx, id)
 }
