@@ -6,13 +6,10 @@ import (
 	"fmt"
 
 	_ "github.com/go-sql-driver/mysql"
-
-	documentstorage "backend/internal/document/storage"
 )
 
 type ConnectionContainer struct {
 	db       *sql.DB
-	files    *documentstorage.Local
 	filesDir string
 }
 
@@ -26,17 +23,10 @@ func NewConnectionContainer(ctx context.Context, cfg Config) (*ConnectionContain
 		return nil, fmt.Errorf("база недоступна: %w", err)
 	}
 
-	files, err := documentstorage.NewLocal(cfg.FilesDir) 
-	if err != nil {
-		_ = db.Close()
-		return nil, fmt.Errorf("папка для файлов недоступна: %w", err)
-	}
-
-	return &ConnectionContainer{db: db, files: files, filesDir: cfg.FilesDir}, nil
+	return &ConnectionContainer{db: db, filesDir: cfg.FilesDir}, nil
 }
 
-func (c *ConnectionContainer) DB() *sql.DB                  { return c.db }
-func (c *ConnectionContainer) Files() *documentstorage.Local { return c.files }
-func (c *ConnectionContainer) FilesDir() string              { return c.filesDir }
+func (c *ConnectionContainer) DB() *sql.DB     { return c.db }
+func (c *ConnectionContainer) FilesDir() string { return c.filesDir }
 
 func (c *ConnectionContainer) Close() error { return c.db.Close() }

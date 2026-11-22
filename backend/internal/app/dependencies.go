@@ -7,9 +7,11 @@ import (
 	"backend/internal/child"
 	childapi "backend/internal/child/api"
 	childmysql "backend/internal/child/mysql"
-	"backend/internal/document"
-	documentapi "backend/internal/document/api"
-	documentmysql "backend/internal/document/mysql"
+	documentadapter "backend/internal/document/infrastructure/adapter"
+	documentcommand "backend/internal/document/application/command"
+	documentmysql "backend/internal/document/infrastructure/mysql"
+	documenthttp "backend/internal/document/interfaces/httpapi"
+	documentstorage "backend/internal/document/infrastructure/storage"
 	"backend/internal/donor"
 	donorapi "backend/internal/donor/api"
 	donormysql "backend/internal/donor/mysql"
@@ -23,9 +25,10 @@ import (
 	"backend/internal/learn"
 	learnclient "backend/internal/learn/infrastructure/client"
 	learnmysql "backend/internal/learn/infrastructure/mysql"
-	"backend/internal/lifecycle"
-	lifecycleapi "backend/internal/lifecycle/api"
-	lifecyclemysql "backend/internal/lifecycle/mysql"
+	lifecycleadapter "backend/internal/lifecycle/infrastructure/adapter"
+	lifecyclecommand "backend/internal/lifecycle/application/command"
+	lifecyclemysql "backend/internal/lifecycle/infrastructure/mysql"
+	lifecyclehttp "backend/internal/lifecycle/interfaces/httpapi"
 	"backend/internal/mother"
 	motherapi "backend/internal/mother/api"
 	mothermysql "backend/internal/mother/mysql"
@@ -95,7 +98,13 @@ func NewDependencyContainer(cfg Config, conns *ConnectionContainer) *DependencyC
 		profilecommand.NewSetStatusHandler(profileRepo),
 		profileReads,
 	)
-	lifecycleHandler := lifecycleapi.New(lifecycle.NewService(lifecyclemysql.NewRepo(db), motherService))
+	lifecycleRepo := lifecyclemysql.NewRepository(db)
+	lifecycleReads := lifecyclemysql.NewReadModel(db)
+	lifecycleMothers := lifecycleadapter.NewMotherDirectory(motherService)
+	lifecycleHandler := lifecyclehttp.NewHandler(
+		lifecyclecommand.NewChangeHandler(lifecycleRepo, lifecycleMothers),
+		lifecycleReads,
+	)
 
 	requestRepo := requestmysql.NewRepository(db)
 	requestUoW := requestmysql.NewUnitOfWork(db)
@@ -109,8 +118,21 @@ func NewDependencyContainer(cfg Config, conns *ConnectionContainer) *DependencyC
 		requestReads,
 	)
 
-	documentService := document.NewService(documentmysql.NewRepo(db), conns.Files(), motherService, helpAdapter{s: helpService})
-	documentHandler := documentapi.New(documentService)
+	documentStorage, err := documentstorage.NewLocal(cfg.FilesDir)
+	if err != nil {
+		log.Fatalf("file storage: %v", err)
+	}
+	documentRepo := documentmysql.NewRepository(db)
+	documentReads := documentmysql.NewReadModel(db)
+	documentMothers := documentadapter.NewMotherDirectory(motherService)
+	documentHelps := documentadapter.NewHelpDirectory(helpService)
+	documentHandler := documenthttp.NewHandler(
+		documentcommand.NewCreateHandler(documentRepo, documentMothers, documentHelps),
+		documentcommand.NewAttachFileHandler(documentRepo, documentStorage),
+		documentcommand.NewDownloadHandler(documentRepo, documentStorage),
+		documentcommand.NewSignHandler(documentRepo),
+		documentReads,
+	)
 
 	donorHandler := donorapi.New(donor.NewService(donormysql.NewRepo(db)))
 	reportHandler := reportapi.New(report.NewService(reportmysql.NewRepo(db)))

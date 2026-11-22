@@ -5,6 +5,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+
+	"backend/internal/document/domain"
 )
 
 type Local struct {
@@ -20,7 +22,7 @@ func NewLocal(dir string) (*Local, error) {
 
 func (l *Local) path(name string) (string, error) {
 	if name == "" || filepath.Base(name) != name {
-		return "", errors.New("bad file name")
+		return "", domain.ErrFileStorage
 	}
 	return filepath.Join(l.dir, name), nil
 }
@@ -36,7 +38,7 @@ func (l *Local) Put(name string, content io.Reader) error {
 	}
 	if _, err := io.Copy(f, content); err != nil {
 		f.Close()
-		os.Remove(p) 
+		os.Remove(p)
 		return err
 	}
 	return f.Close()
