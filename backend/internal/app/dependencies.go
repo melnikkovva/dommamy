@@ -13,9 +13,10 @@ import (
 	"backend/internal/donor"
 	donorapi "backend/internal/donor/api"
 	donormysql "backend/internal/donor/mysql"
-	"backend/internal/event"
-	eventapi "backend/internal/event/api"
-	eventmysql "backend/internal/event/mysql"
+	eventadapter "backend/internal/event/infrastructure/adapter"
+	eventcommand "backend/internal/event/application/command"
+	eventmysql "backend/internal/event/infrastructure/mysql"
+	eventhttp "backend/internal/event/interfaces/httpapi"
 	"backend/internal/help"
 	helpapi "backend/internal/help/api"
 	helpmysql "backend/internal/help/mysql"
@@ -28,9 +29,10 @@ import (
 	"backend/internal/mother"
 	motherapi "backend/internal/mother/api"
 	mothermysql "backend/internal/mother/mysql"
-	"backend/internal/profile"
-	profileapi "backend/internal/profile/api"
-	profilemysql "backend/internal/profile/mysql"
+	profileadapter "backend/internal/profile/infrastructure/adapter"
+	profilecommand "backend/internal/profile/application/command"
+	profilemysql "backend/internal/profile/infrastructure/mysql"
+	profilehttp "backend/internal/profile/interfaces/httpapi"
 	"backend/internal/report"
 	reportapi "backend/internal/report/api"
 	reportmysql "backend/internal/report/mysql"
@@ -73,8 +75,26 @@ func NewDependencyContainer(cfg Config, conns *ConnectionContainer) *DependencyC
 	helpHandler := helpapi.New(helpService)
 
 	childHandler := childapi.New(child.NewService(childmysql.NewRepo(db), motherService))
-	eventHandler := eventapi.New(event.NewService(eventmysql.NewRepo(db), motherService))
-	profileHandler := profileapi.New(profile.NewService(profilemysql.NewRepo(db), motherService))
+
+	eventRepo := eventmysql.NewRepository(db)
+	eventUoW := eventmysql.NewUnitOfWork(db)
+	eventReads := eventmysql.NewReadModel(db)
+	eventMothers := eventadapter.NewMotherDirectory(motherService)
+	eventHandler := eventhttp.NewHandler(
+		eventcommand.NewCreateEventHandler(eventRepo),
+		eventcommand.NewRegisterHandler(eventUoW, eventMothers),
+		eventcommand.NewMarkHandler(eventUoW),
+		eventReads,
+	)
+
+	profileRepo := profilemysql.NewRepository(db)
+	profileReads := profilemysql.NewReadModel(db)
+	profileMothers := profileadapter.NewMotherDirectory(motherService)
+	profileHandler := profilehttp.NewHandler(
+		profilecommand.NewSaveHandler(profileRepo, profileMothers, now),
+		profilecommand.NewSetStatusHandler(profileRepo),
+		profileReads,
+	)
 	lifecycleHandler := lifecycleapi.New(lifecycle.NewService(lifecyclemysql.NewRepo(db), motherService))
 
 	requestRepo := requestmysql.NewRepository(db)
