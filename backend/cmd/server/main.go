@@ -31,7 +31,10 @@ func run() error {
 	}
 	defer conns.Close()
 
-	deps := app.NewDependencyContainer(cfg, conns)
+	deps, err := app.NewDependencyContainer(cfg, conns)
+	if err != nil {
+		return err
+	}
 
 	go deps.LearnSyncWorker().Run(ctx)
 

@@ -3,29 +3,54 @@ package command
 import (
 	"context"
 
+	motherquery "backend/internal/mother/application/query"
 	"backend/internal/mother/domain"
 )
 
-type UpdatePhoto struct {
-	MotherID int
-	PhotoURL string
+type UploadPhoto struct {
+	MotherID    int
+	Data        []byte
+	ContentType string
 }
 
-type UpdatePhotoHandler interface {
-	Handle(ctx context.Context, cmd UpdatePhoto) error
+type UploadPhotoHandler interface {
+	Handle(ctx context.Context, cmd UploadPhoto) (string, error)
 }
 
-func NewUpdatePhotoHandler(repo domain.Repository) UpdatePhotoHandler {
-	return &updatePhotoHandler{repo: repo}
-}
-
-type updatePhotoHandler struct {
-	repo domain.Repository
-}
-
-func (h *updatePhotoHandler) Handle(ctx context.Context, cmd UpdatePhoto) error {
-	if _, err := h.repo.ByID(ctx, cmd.MotherID); err != nil {
-		return err
+func NewUploadPhotoHandler(
+	repo domain.Repository,
+	storage domain.PhotoStorage,
+	reads motherquery.ReadModel,
+) UploadPhotoHandler {
+	return &uploadPhotoHandler{
+		repo:    repo,
+		storage: storage,
+		reads:   reads,
 	}
-	return h.repo.UpdatePhotoURL(ctx, cmd.MotherID, cmd.PhotoURL)
+}
+
+type uploadPhotoHandler struct {
+	repo    domain.Repository
+	storage domain.PhotoStorage
+	reads   motherquery.ReadModel
+}
+
+func (h *uploadPhotoHandler) Handle(ctx context.Context, cmd UploadPhoto) (string, error) {
+	exists, err := h.reads.Exists(ctx, cmd.MotherID)
+	if err != nil {
+		return "", err
+	}
+	if !exists {
+		return "", domain.ErrNotFound
+	}
+
+	photoURL, err := h.storage.Upload(ctx, cmd.Data, cmd.ContentType)
+	if err != nil {
+		return "", err
+	}
+
+	if err := h.repo.UpdatePhotoURL(ctx, cmd.MotherID, photoURL); err != nil {
+		return "", err
+	}
+	return photoURL, nil
 }

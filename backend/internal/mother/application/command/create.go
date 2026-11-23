@@ -2,6 +2,7 @@ package command
 
 import (
 	"context"
+	"time"
 
 	"backend/internal/mother/domain"
 )
@@ -26,12 +27,15 @@ type createHandler struct {
 }
 
 func (h *createHandler) Handle(ctx context.Context, cmd Create) (domain.MotherSnapshot, error) {
-	m, err := domain.NewMother(cmd.FirstName, cmd.LastName, cmd.Phone, cmd.Email)
+	m, err := domain.NewMother(cmd.FirstName, cmd.LastName, cmd.Phone, cmd.Email, time.Now())
 	if err != nil {
 		return domain.MotherSnapshot{}, err
 	}
-	if err := h.repo.Save(ctx, m); err != nil {
+	id, err := h.repo.Add(ctx, m)
+	if err != nil {
 		return domain.MotherSnapshot{}, err
 	}
-	return m.Snapshot(), nil
+	snapshot := m.Snapshot()
+	snapshot.ID = id
+	return snapshot, nil
 }

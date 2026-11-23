@@ -4,7 +4,7 @@ import (
 	"context"
 
 	learndomain "backend/internal/learn/domain"
-	"backend/internal/mother/domain"
+	motherquery "backend/internal/mother/application/query"
 )
 
 type MotherDirectory struct {
@@ -23,18 +23,6 @@ func (d *MotherDirectory) Exists(ctx context.Context, id int) (bool, error) {
 	return d.reads.Exists(ctx, id)
 }
 
-type MotherChecker struct {
-	reads ReadModel
-}
-
-func NewMotherChecker(reads ReadModel) *MotherChecker {
-	return &MotherChecker{reads: reads}
-}
-
-func (c *MotherChecker) Exists(id int) (bool, error) {
-	return c.reads.Exists(context.Background(), id)
-}
-
 type LearnStatsAdapter struct {
 	reads LearnStatsReads
 }
@@ -49,28 +37,28 @@ func NewLearnStatsAdapter(reads LearnStatsReads) *LearnStatsAdapter {
 	return &LearnStatsAdapter{reads: reads}
 }
 
-func (a *LearnStatsAdapter) GetCourseStats(ctx context.Context, learnUserID string) (domain.CourseStatsDTO, error) {
+func (a *LearnStatsAdapter) GetCourseStats(ctx context.Context, learnUserID string) (motherquery.CourseStatsDTO, error) {
 	stats, err := a.reads.GetCourseStats(ctx, learnUserID)
 	if err != nil {
-		return domain.CourseStatsDTO{}, err
+		return motherquery.CourseStatsDTO{}, err
 	}
-	return domain.CourseStatsDTO{
-		TotalCourses:     stats.TotalCourses,
-		CompletedCourses: stats.CompletedCourses,
+	return motherquery.CourseStatsDTO{
+		TotalCourses:      stats.TotalCourses,
+		CompletedCourses:  stats.CompletedCourses,
 		InProgressCourses: stats.InProgressCourses,
-		AverageProgress:  stats.AverageProgress,
-		TotalTimeSpent:   stats.TotalTimeSpent,
+		AverageProgress:   stats.AverageProgress,
+		TotalTimeSpent:    stats.TotalTimeSpent,
 	}, nil
 }
 
-func (a *LearnStatsAdapter) GetCourseResults(ctx context.Context, learnUserID string) ([]domain.CourseResultDTO, error) {
+func (a *LearnStatsAdapter) GetCourseResults(ctx context.Context, learnUserID string) ([]motherquery.CourseResultDTO, error) {
 	results, err := a.reads.GetCourseResults(ctx, learnUserID)
 	if err != nil {
 		return nil, err
 	}
-	dtos := make([]domain.CourseResultDTO, len(results))
+	dtos := make([]motherquery.CourseResultDTO, len(results))
 	for i, r := range results {
-		dtos[i] = domain.CourseResultDTO{
+		dtos[i] = motherquery.CourseResultDTO{
 			CourseID:         r.CourseId,
 			NameCourse:       r.NameCourse,
 			AccesDate:        r.AccesDate.Format("2006-01-02T15:04"),
@@ -96,14 +84,14 @@ func (a *LearnStatsAdapter) GetCourseResults(ctx context.Context, learnUserID st
 	return dtos, nil
 }
 
-func (a *LearnStatsAdapter) GetIPRPlans(ctx context.Context, learnUserID string) ([]domain.IPRPlanDTO, error) {
+func (a *LearnStatsAdapter) GetIPRPlans(ctx context.Context, learnUserID string) ([]motherquery.IPRPlanDTO, error) {
 	plans, err := a.reads.GetIPRPlans(ctx, learnUserID)
 	if err != nil {
 		return nil, err
 	}
-	dtos := make([]domain.IPRPlanDTO, len(plans))
+	dtos := make([]motherquery.IPRPlanDTO, len(plans))
 	for i, p := range plans {
-		dtos[i] = domain.IPRPlanDTO{
+		dtos[i] = motherquery.IPRPlanDTO{
 			PlanID:         p.PlanID,
 			Title:          p.Title,
 			EmployeeID:     p.EmployeeID,
@@ -120,9 +108,9 @@ func (a *LearnStatsAdapter) GetIPRPlans(ctx context.Context, learnUserID string)
 			s := p.EndDate.Format("2006-01-02T15:04")
 			dtos[i].EndDate = &s
 		}
-		stages := make([]domain.IPRStageDTO, len(p.Stages))
+		stages := make([]motherquery.IPRStageDTO, len(p.Stages))
 		for j, s := range p.Stages {
-			stages[j] = domain.IPRStageDTO{
+			stages[j] = motherquery.IPRStageDTO{
 				StageID:     s.StageID,
 				Title:       s.Title,
 				Description: s.Description,
@@ -135,9 +123,9 @@ func (a *LearnStatsAdapter) GetIPRPlans(ctx context.Context, learnUserID string)
 				str := s.EndDate.Format("2006-01-02T15:04")
 				stages[j].EndDate = &str
 			}
-			tasks := make([]domain.IPRTaskDTO, len(s.Tasks))
+			tasks := make([]motherquery.IPRTaskDTO, len(s.Tasks))
 			for k, t := range s.Tasks {
-				tasks[k] = domain.IPRTaskDTO{
+				tasks[k] = motherquery.IPRTaskDTO{
 					TaskID:    t.TaskID,
 					TaskType:  t.TaskType,
 					Title:     t.Title,

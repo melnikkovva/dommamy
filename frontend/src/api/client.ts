@@ -6,7 +6,12 @@ export class ApiError extends Error {
   }
 }
 async function send<T>(method: string, url: string, body?: BodyInit, headers?: Record<string, string>): Promise<T> {
-  const res = await fetch(url, { method, body, headers })
+  const token = localStorage.getItem('auth_token')
+  const mergedHeaders = { ...headers }
+  if (token) {
+    mergedHeaders['Authorization'] = 'Bearer ' + token
+  }
+  const res = await fetch(url, { method, body, headers: mergedHeaders })
   const text = await res.text()
   let data: any = null
   if (text) {

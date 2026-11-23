@@ -2,9 +2,9 @@ package httpapi
 
 import (
 	"errors"
-	"log"
 	"net/http"
 
+	"backend/internal/auth"
 	"backend/internal/profile/application/command"
 	"backend/internal/profile/application/query"
 	"backend/internal/profile/domain"
@@ -12,9 +12,10 @@ import (
 )
 
 type Handler struct {
-	saveHandler    command.SaveHandler
+	saveHandler      command.SaveHandler
 	setStatusHandler command.SetStatusHandler
-	reads          query.ReadModel
+	reads            query.ReadModel
+	mapper           *httpx.ErrorMapper
 }
 
 func NewHandler(
@@ -23,9 +24,18 @@ func NewHandler(
 	reads query.ReadModel,
 ) *Handler {
 	return &Handler{
-		saveHandler:    save,
+		saveHandler:      save,
 		setStatusHandler: setStatus,
-		reads:          reads,
+		reads:            reads,
+		mapper: httpx.NewErrorMapper(
+			httpx.WithValidation(
+				domain.ErrMother, domain.ErrNoMother,
+				domain.ErrBirth, domain.ErrIncome,
+				domain.ErrWeeks, domain.ErrStatus,
+				domain.ErrTransition, domain.ErrNotFilled,
+				domain.ErrNotComplete,
+			),
+		),
 	}
 }
 
@@ -59,19 +69,20 @@ type saveRequest struct {
 func (h *Handler) get(w http.ResponseWriter, r *http.Request) {
 	motherID, err := httpx.PathID(r, "id")
 	if err != nil {
-		httpx.WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect id"})
+		httpx.WriteError(w, http.StatusBadRequest, "incorrect id")
+		return
+	}
+	if !auth.RequireOwnershipOrAdmin(w, r, motherID) {
 		return
 	}
 
 	v, err := h.reads.GetByMother(r.Context(), motherID)
-	if err != nil {
-		fail(w, "get profile", err)
-		return
-	}
-
-	if v.MotherID == 0 {
+	if errors.Is(err, domain.ErrNotFilled) {
 		v.MotherID = motherID
 		v.Status = domain.StatusDraft
+	} else if err != nil {
+		h.mapper.Handle(w, "get profile", err)
+		return
 	}
 
 	httpx.WriteJSON(w, http.StatusOK, v)
@@ -80,13 +91,20 @@ func (h *Handler) get(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) save(w http.ResponseWriter, r *http.Request) {
 	motherID, err := httpx.PathID(r, "id")
 	if err != nil {
-		httpx.WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect id"})
+		httpx.WriteError(w, http.StatusBadRequest, "incorrect id")
+		return
+	}
+	if !auth.RequireOwnershipOrAdmin(w, r, motherID) {
 		return
 	}
 
-	req, err := httpx.ReadJSON[saveRequest](r)
+	req, err := httpx.ReadJSON[saveRequest](w, r)
 	if err != nil {
-		httpx.WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect JSON"})
+		if httpx.IsMaxBytesExceeded(err) {
+			httpx.WriteError(w, http.StatusRequestEntityTooLarge, "request body too large")
+			return
+		}
+		httpx.WriteError(w, http.StatusBadRequest, "incorrect JSON")
 		return
 	}
 
@@ -112,7 +130,7 @@ func (h *Handler) save(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.saveHandler.Handle(r.Context(), cmd); err != nil {
-		fail(w, "save profile", err)
+		h.mapper.Handle(w, "save profile", err)
 		return
 	}
 
@@ -122,15 +140,22 @@ func (h *Handler) save(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) setStatus(w http.ResponseWriter, r *http.Request) {
 	motherID, err := httpx.PathID(r, "id")
 	if err != nil {
-		httpx.WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect id"})
+		httpx.WriteError(w, http.StatusBadRequest, "incorrect id")
+		return
+	}
+	if !auth.RequireOwnershipOrAdmin(w, r, motherID) {
 		return
 	}
 
 	req, err := httpx.ReadJSON[struct {
 		Status string `json:"status"`
-	}](r)
+	}](w, r)
 	if err != nil {
-		httpx.WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect JSON"})
+		if httpx.IsMaxBytesExceeded(err) {
+			httpx.WriteError(w, http.StatusRequestEntityTooLarge, "request body too large")
+			return
+		}
+		httpx.WriteError(w, http.StatusBadRequest, "incorrect JSON")
 		return
 	}
 
@@ -138,7 +163,7 @@ func (h *Handler) setStatus(w http.ResponseWriter, r *http.Request) {
 		MotherID: motherID,
 		Status:   req.Status,
 	}); err != nil {
-		fail(w, "set profile status", err)
+		h.mapper.Handle(w, "set profile status", err)
 		return
 	}
 
@@ -150,23 +175,9 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 
 	items, err := h.reads.ListByStatus(r.Context(), status)
 	if err != nil {
-		fail(w, "list profiles", err)
+		h.mapper.Handle(w, "list profiles", err)
 		return
 	}
 
 	httpx.WriteJSON(w, http.StatusOK, items)
-}
-
-func fail(w http.ResponseWriter, where string, err error) {
-	switch {
-	case errors.Is(err, domain.ErrMother), errors.Is(err, domain.ErrNoMother),
-		errors.Is(err, domain.ErrBirth), errors.Is(err, domain.ErrIncome),
-		errors.Is(err, domain.ErrWeeks), errors.Is(err, domain.ErrStatus),
-		errors.Is(err, domain.ErrTransition), errors.Is(err, domain.ErrNotFilled),
-		errors.Is(err, domain.ErrNotComplete):
-		httpx.WriteError(w, http.StatusUnprocessableEntity, err.Error())
-	default:
-		log.Println("error", where+":", err)
-		httpx.WriteError(w, http.StatusInternalServerError, "something went wrong")
-	}
 }

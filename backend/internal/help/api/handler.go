@@ -1,12 +1,11 @@
 package api
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
-	"time"
-	"fmt"
+
 	"backend/internal/help"
+	"backend/internal/shared/httpx"
 )
 
 type Handler struct {
@@ -14,7 +13,7 @@ type Handler struct {
 }
 
 func New(s *help.Service) *Handler {
-	return &Handler{ s : s }
+	return &Handler{s: s}
 }
 
 func (h *Handler) Register(mux *http.ServeMux) {
@@ -30,25 +29,29 @@ type itemRequest struct {
 }
 
 type itemResponse struct {
-	Id int `json:"id"`
-	MotherId int `json:"mother_id"`
-	Kind string `json:"kind"`
-	Sum int `json:"sum"`
+	Id       int    `json:"id"`
+	MotherId int    `json:"mother_id"`
+	Kind     string `json:"kind"`
+	Sum      int    `json:"sum"`
 	CheckUrl string `json:"check_url"`
-	CreatedAt time.Time `json:"created_at"`
+	CreatedAt string `json:"created_at"`
 }
 
 func handleToResponse(i *help.Item) itemResponse {
 	return itemResponse{
 		Id: i.Id, MotherId: i.MotherId, Kind: string(i.Kind),
-		Sum: i.Sum, CheckUrl: i.CheckUrl, CreatedAt: i.CreatedAt,
+		Sum: i.Sum, CheckUrl: i.CheckUrl, CreatedAt: i.CreatedAt.Format(httpx.APITime),
 	}
 }
 
 func (h *Handler) item(w http.ResponseWriter, r *http.Request) {
-	var req itemRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.writeError(w, http.StatusBadRequest, "incorrect JSON")
+	req, err := httpx.ReadJSON[itemRequest](w, r)
+	if err != nil {
+		if httpx.IsMaxBytesExceeded(err) {
+			httpx.WriteError(w, http.StatusRequestEntityTooLarge, "request body too large")
+			return
+		}
+		httpx.WriteError(w, http.StatusBadRequest, "incorrect JSON")
 		return
 	}
 
@@ -57,13 +60,13 @@ func (h *Handler) item(w http.ResponseWriter, r *http.Request) {
 		h.writeDomainError(w, err)
 		return
 	}
-	h.writeJSON(w, http.StatusCreated, handleToResponse(item))
+	httpx.WriteJSON(w, http.StatusCreated, handleToResponse(item))
 }
 
 func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 	items, err := h.s.List(r.Context())
 	if err != nil {
-		h.writeError(w, http.StatusInternalServerError, "internal database error")
+		httpx.WriteError(w, http.StatusInternalServerError, "internal database error")
 		return
 	}
 
@@ -71,30 +74,18 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 	for _, i := range items {
 		result = append(result, handleToResponse(i))
 	}
-	h.writeJSON(w, http.StatusOK, result)
+	httpx.WriteJSON(w, http.StatusOK, result)
 }
 
 func (h *Handler) writeDomainError(w http.ResponseWriter, err error) {
 	if errors.Is(err, help.ErrorCheck) || errors.Is(err, help.ErrorSum) ||
 		errors.Is(err, help.ErrorMum) || errors.Is(err, help.ErrorKind) {
 
-		h.writeError(w, http.StatusUnprocessableEntity, err.Error())
+		httpx.WriteError(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}
 
-	h.writeError(w, http.StatusInternalServerError, "something went wrong")
-}
-
-func (h *Handler) writeError(w http.ResponseWriter, status int, msg string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	fmt.Fprintf(w, `{"error": "%s"}`, msg)
-}
-
-func (h *Handler) writeJSON(w http.ResponseWriter, status int, data any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(data)
+	httpx.WriteError(w, http.StatusInternalServerError, "something went wrong")
 }
 
 

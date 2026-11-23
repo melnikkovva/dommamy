@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"log"
 
 	motherquery "backend/internal/mother/application/query"
 	"backend/internal/mother/domain"
@@ -11,10 +12,10 @@ import (
 
 type ReadModel struct {
 	db         *sql.DB
-	learnStats domain.LearnStats
+	learnStats motherquery.LearnStats
 }
 
-func NewReadModel(db *sql.DB, learnStats domain.LearnStats) *ReadModel {
+func NewReadModel(db *sql.DB, learnStats motherquery.LearnStats) *ReadModel {
 	return &ReadModel{db: db, learnStats: learnStats}
 }
 
@@ -36,10 +37,12 @@ func (r *ReadModel) GetByID(ctx context.Context, id int) (motherquery.MotherView
 func (r *ReadModel) Search(ctx context.Context, q string) ([]motherquery.MotherView, error) {
 	rows, err := r.db.QueryContext(
 		ctx,
-		`SELECT id, first_name, last_name, phone, email, learn_user_id, photo_url, created_at
-		 FROM mother
-		 WHERE CONCAT(first_name, ' ', last_name) LIKE CONCAT('%', ?, '%')
-		 ORDER BY last_name, first_name`,
+		`SELECT m.id, m.first_name, m.last_name, m.phone, m.email,
+		        mll.learn_user_id, m.photo_url, m.created_at
+		 FROM mother m
+		 LEFT JOIN mother_learn_link mll ON mll.mother_id = m.id
+		 WHERE CONCAT(m.first_name, ' ', m.last_name) LIKE CONCAT('%', ?, '%')
+		 ORDER BY m.last_name, m.first_name`,
 		q,
 	)
 	if err != nil {
@@ -56,7 +59,9 @@ func (r *ReadModel) Search(ctx context.Context, q string) ([]motherquery.MotherV
 		view := toMotherView(s)
 		if s.LearnUserID != "" && r.learnStats != nil {
 			stats, err := r.learnStats.GetCourseStats(ctx, s.LearnUserID)
-			if err == nil {
+			if err != nil {
+				log.Printf("ReadModel.Search: ошибка получения статистики для mother %d: %v", s.ID, err)
+			} else {
 				view.CourseStats = &stats
 			}
 		}
@@ -74,14 +79,41 @@ func (r *ReadModel) Exists(ctx context.Context, id int) (bool, error) {
 	return count > 0, nil
 }
 
+func (r *ReadModel) GetAllMothers(ctx context.Context) ([]motherquery.MotherRef, error) {
+	rows, err := r.db.QueryContext(
+		ctx,
+		`SELECT id, first_name, last_name, phone, email FROM mother ORDER BY id`,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var refs []motherquery.MotherRef
+	for rows.Next() {
+		var ref motherquery.MotherRef
+		var email sql.NullString
+		if err := rows.Scan(&ref.ID, &ref.FirstName, &ref.LastName, &ref.Phone, &email); err != nil {
+			return nil, err
+		}
+		if email.Valid {
+			ref.Email = email.String
+		}
+		refs = append(refs, ref)
+	}
+	return refs, rows.Err()
+}
+
 func (r *ReadModel) snapshotByID(ctx context.Context, id int) (domain.MotherSnapshot, error) {
 	var s domain.MotherSnapshot
-	var learnUserID sql.NullString
-	var photoURL sql.NullString
+	var learnUserID, photoURL sql.NullString
 	err := r.db.QueryRowContext(
 		ctx,
-		`SELECT id, first_name, last_name, phone, email, learn_user_id, photo_url, created_at
-		 FROM mother WHERE id = ?`, id,
+		`SELECT m.id, m.first_name, m.last_name, m.phone, m.email,
+		        mll.learn_user_id, m.photo_url, m.created_at
+		 FROM mother m
+		 LEFT JOIN mother_learn_link mll ON mll.mother_id = m.id
+		 WHERE m.id = ?`, id,
 	).Scan(&s.ID, &s.FirstName, &s.LastName, &s.Phone, &s.Email, &learnUserID, &photoURL, &s.CreatedAt)
 
 	if errors.Is(err, sql.ErrNoRows) {

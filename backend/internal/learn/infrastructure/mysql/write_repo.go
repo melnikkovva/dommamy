@@ -115,9 +115,23 @@ func (r *WriteRepo) SaveIPRPlans(ctx context.Context, plans []domain.IPRPlan) er
 		return nil
 	}
 
-	r.db.ExecContext(ctx, "DELETE FROM lms_ipr_tasks")
-	r.db.ExecContext(ctx, "DELETE FROM lms_ipr_stages")
-	r.db.ExecContext(ctx, "DELETE FROM lms_ipr_plans")
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("начало транзакции ИПР: %w", err)
+	}
+
+	if _, err := tx.ExecContext(ctx, "DELETE FROM lms_ipr_tasks"); err != nil {
+		tx.Rollback()
+		return fmt.Errorf("очистка lms_ipr_tasks: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, "DELETE FROM lms_ipr_stages"); err != nil {
+		tx.Rollback()
+		return fmt.Errorf("очистка lms_ipr_stages: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, "DELETE FROM lms_ipr_plans"); err != nil {
+		tx.Rollback()
+		return fmt.Errorf("очистка lms_ipr_plans: %w", err)
+	}
 
 	planQuery := `
 		INSERT INTO lms_ipr_plans (
@@ -145,12 +159,13 @@ func (r *WriteRepo) SaveIPRPlans(ctx context.Context, plans []domain.IPRPlan) er
 
 		goalsJSON, _ := json.Marshal(p.Goals)
 
-		_, err := r.db.ExecContext(ctx, planQuery,
+		_, err := tx.ExecContext(ctx, planQuery,
 			p.PlanID, p.Title, p.EmployeeID, p.MentorID, p.MentorName,
 			p.StartDate, endDate, p.Status, p.Progress,
 			p.CompletedTasks, p.TotalTasks, string(goalsJSON),
 		)
 		if err != nil {
+			tx.Rollback()
 			return fmt.Errorf("сохранение ИПР %s: %w", p.PlanID, err)
 		}
 
@@ -164,10 +179,11 @@ func (r *WriteRepo) SaveIPRPlans(ctx context.Context, plans []domain.IPRPlan) er
 				sEnd = sql.NullTime{Time: *s.EndDate, Valid: true}
 			}
 
-			stageResult, err := r.db.ExecContext(ctx, stageQuery,
+			stageResult, err := tx.ExecContext(ctx, stageQuery,
 				p.PlanID, s.StageID, s.Title, s.Description, sStart, sEnd,
 			)
 			if err != nil {
+				tx.Rollback()
 				return fmt.Errorf("сохранение этапа %s: %w", s.StageID, err)
 			}
 			stageID, _ := stageResult.LastInsertId()
@@ -182,15 +198,17 @@ func (r *WriteRepo) SaveIPRPlans(ctx context.Context, plans []domain.IPRPlan) er
 					completionDate = sql.NullTime{Time: *t.CompletionDate, Valid: true}
 				}
 
-				_, err := r.db.ExecContext(ctx, taskQuery,
+				_, err := tx.ExecContext(ctx, taskQuery,
 					stageID, t.TaskID, t.TaskType, t.Title, t.Description,
 					t.Status, t.IsOverdue, dueDate, completionDate,
 				)
 				if err != nil {
+					tx.Rollback()
 					return fmt.Errorf("сохранение задачи %s: %w", t.TaskID, err)
 				}
 			}
 		}
 	}
-	return nil
+
+	return tx.Commit()
 }

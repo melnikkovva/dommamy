@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"errors"
 
+	mysqldriver "github.com/go-sql-driver/mysql"
+
 	"backend/internal/user"
 )
 
@@ -21,6 +23,10 @@ func (r *Repo) Save(u *user.User) error {
 		u.Login, u.Password, u.FirstName, u.LastName, u.Role, u.MotherId, u.CreatedAt,
 	)
 	if err != nil {
+		var me *mysqldriver.MySQLError
+		if errors.As(err, &me) && me.Number == 1062 {
+			return user.ErrorLoginTaken
+		}
 		return err
 	}
 	id, err := res.LastInsertId()

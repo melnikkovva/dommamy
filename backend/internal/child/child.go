@@ -13,18 +13,18 @@ type Child struct {
 	CreatedAt time.Time
 }
 
-func AddNew(motherId int, firstName string, birthDate time.Time) (*Child, error) {
+func AddNew(motherId int, firstName string, birthDate time.Time, now time.Time) (*Child, error) {
 	firstName = strings.TrimSpace(firstName)
 	if firstName == "" {
 		return nil, ErrorName
 	}
-	if birthDate.After(time.Now()) {
+	if birthDate.After(now) {
 		return nil, ErrorBirth
 	}
 	return &Child{
 		MotherId: motherId,
 		FirstName: firstName,
 		BirthDate: birthDate,
-		CreatedAt: time.Now(),
+		CreatedAt: now,
 	}, nil
 }

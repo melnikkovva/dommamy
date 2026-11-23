@@ -1,6 +1,7 @@
 package app
 
 import (
+	"database/sql"
 	"log"
 	"time"
 
@@ -15,19 +16,17 @@ import (
 	"backend/internal/donor"
 	donorapi "backend/internal/donor/api"
 	donormysql "backend/internal/donor/mysql"
-	eventadapter "backend/internal/event/infrastructure/adapter"
 	eventcommand "backend/internal/event/application/command"
 	eventmysql "backend/internal/event/infrastructure/mysql"
 	eventhttp "backend/internal/event/interfaces/httpapi"
 	"backend/internal/help"
 	helpapi "backend/internal/help/api"
 	helpmysql "backend/internal/help/mysql"
-	"backend/internal/learn/domain"
+	learndomain "backend/internal/learn/domain"
 	learnadapter "backend/internal/learn/infrastructure/adapter"
 	learnclient "backend/internal/learn/infrastructure/client"
 	learncommand "backend/internal/learn/application/command"
 	learnmysql "backend/internal/learn/infrastructure/mysql"
-	lifecycleadapter "backend/internal/lifecycle/infrastructure/adapter"
 	lifecyclecommand "backend/internal/lifecycle/application/command"
 	lifecyclemysql "backend/internal/lifecycle/infrastructure/mysql"
 	lifecyclehttp "backend/internal/lifecycle/interfaces/httpapi"
@@ -35,7 +34,8 @@ import (
 	mothercommand "backend/internal/mother/application/command"
 	mothermysql "backend/internal/mother/infrastructure/mysql"
 	motherhttp "backend/internal/mother/interfaces/httpapi"
-	profileadapter "backend/internal/profile/infrastructure/adapter"
+	motherquery "backend/internal/mother/application/query"
+	motherstorage "backend/internal/mother/infrastructure/storage"
 	profilecommand "backend/internal/profile/application/command"
 	profilemysql "backend/internal/profile/infrastructure/mysql"
 	profilehttp "backend/internal/profile/interfaces/httpapi"
@@ -63,105 +63,39 @@ type DependencyContainer struct {
 	learnWorker *LearnSyncWorker
 }
 
-func NewDependencyContainer(cfg Config, conns *ConnectionContainer) *DependencyContainer {
+func NewDependencyContainer(cfg Config, conns *ConnectionContainer) (*DependencyContainer, error) {
 	db := conns.DB()
 	now := time.Now
 
-	motherRepo := mothermysql.NewRepository(db)
-	learnWriteRepo := learnmysql.NewWriteRepo(db)
-	learnReadModel := learnmysql.NewReadModel(db)
-	learnStatsAdapter := motheradapter.NewLearnStatsAdapter(learnReadModel)
-	motherReads := mothermysql.NewReadModel(db, learnStatsAdapter)
-	motherHandler := motherhttp.NewHandler(
-		mothercommand.NewCreateHandler(motherRepo),
-		mothercommand.NewUpdatePhotoHandler(motherRepo),
-		motherReads,
-		motherRepo,
-		learnStatsAdapter,
-		cfg.FilesDir,
-	)
-	motherDirectory := motheradapter.NewMotherDirectory(motherReads)
-	motherChecker := motheradapter.NewMotherChecker(motherReads)
+	motherDirectory, motherHandler := wireMother(db, cfg.FilesDir)
 
-	watchingRepo := watchingmysql.NewRepo(db)
+	secretHandler := wireSecretInfo(db, motherDirectory)
 
-	secretService := secretInfo.NewService(secretinfomysql.NewRepo(db), motherChecker, watchingRepo)
-	secretHandler := secretinfoapi.New(secretService)
+	helpHandler, helpService := wireHelp(db, motherDirectory)
 
-	helpService := help.NewService(helpmysql.NewRepo(db), motherChecker)
-	helpHandler := helpapi.New(helpService)
+	childHandler := wireChild(db, motherDirectory)
 
-	childHandler := childapi.New(child.NewService(childmysql.NewRepo(db), motherChecker))
+	eventHandler := wireEvent(db, motherDirectory)
 
-	eventRepo := eventmysql.NewRepository(db)
-	eventUoW := eventmysql.NewUnitOfWork(db)
-	eventReads := eventmysql.NewReadModel(db)
-	eventMothers := eventadapter.NewMotherDirectory(motherDirectory)
-	eventHandler := eventhttp.NewHandler(
-		eventcommand.NewCreateEventHandler(eventRepo),
-		eventcommand.NewRegisterHandler(eventUoW, eventMothers),
-		eventcommand.NewMarkHandler(eventUoW),
-		eventReads,
-	)
+	profileHandler := wireProfile(db, motherDirectory, now)
 
-	profileRepo := profilemysql.NewRepository(db)
-	profileReads := profilemysql.NewReadModel(db)
-	profileMothers := profileadapter.NewMotherDirectory(motherChecker)
-	profileHandler := profilehttp.NewHandler(
-		profilecommand.NewSaveHandler(profileRepo, profileMothers, now),
-		profilecommand.NewSetStatusHandler(profileRepo),
-		profileReads,
-	)
-	lifecycleRepo := lifecyclemysql.NewRepository(db)
-	lifecycleReads := lifecyclemysql.NewReadModel(db)
-	lifecycleMothers := lifecycleadapter.NewMotherDirectory(motherDirectory)
-	lifecycleHandler := lifecyclehttp.NewHandler(
-		lifecyclecommand.NewChangeHandler(lifecycleRepo, lifecycleMothers),
-		lifecycleReads,
-	)
+	lifecycleHandler := wireLifecycle(db, motherDirectory)
 
-	requestRepo := requestmysql.NewRepository(db)
-	requestUoW := requestmysql.NewUnitOfWork(db)
-	requestReads := requestmysql.NewReadModel(db)
-	requestMothers := requestadapter.NewMotherDirectory(motherDirectory)
-	requestHelps := requestadapter.NewHelpDirectory(helpService)
-	requestHandler := requesthttp.NewHandler(
-		requestcommand.NewCreateRequestHandler(requestRepo, requestMothers, now),
-		requestcommand.NewChangeStatusHandler(requestUoW, now),
-		requestcommand.NewFulfillRequestHandler(requestUoW, requestHelps, now),
-		requestReads,
-	)
-
-	documentStorage, err := documentstorage.NewLocal(cfg.FilesDir)
+	requestHandler, err := wireRequest(db, motherDirectory, helpService, now)
 	if err != nil {
-		log.Fatalf("file storage: %v", err)
+		return nil, err
 	}
-	documentRepo := documentmysql.NewRepository(db)
-	documentReads := documentmysql.NewReadModel(db)
-	documentMothers := documentadapter.NewMotherDirectory(motherDirectory)
-	documentHelps := documentadapter.NewHelpDirectory(helpService)
-	documentHandler := documenthttp.NewHandler(
-		documentcommand.NewCreateHandler(documentRepo, documentMothers, documentHelps),
-		documentcommand.NewAttachFileHandler(documentRepo, documentStorage),
-		documentcommand.NewDownloadHandler(documentRepo, documentStorage),
-		documentcommand.NewSignHandler(documentRepo),
-		documentReads,
-	)
 
-	donorHandler := donorapi.New(donor.NewService(donormysql.NewRepo(db)))
-	reportHandler := reportapi.New(report.NewService(reportmysql.NewRepo(db)))
-	userHandler := userapi.New(user.NewService(usermysql.NewRepo(db), cfg.AuthSecret, cfg.AuthTTL))
-
-	var learnAPI domain.APIClient
-	if cfg.Learn.Enabled() {
-		learnAPI = learnclient.NewClient(cfg.Learn.BaseURL, cfg.Learn.ClientID, cfg.Learn.ClientSecret)
-		log.Println("Learn API клиент настроен (OAuth 2.0)")
-	} else {
-		log.Println("Learn API не настроен: укажите LEARN_API_BASE_URL, LEARN_API_CLIENT_ID и LEARN_API_CLIENT_SECRET в .env")
+	documentHandler, err := wireDocument(db, cfg.FilesDir, motherDirectory, helpService)
+	if err != nil {
+		return nil, err
 	}
-	syncHandler := learncommand.NewSyncHandler(learnWriteRepo, learnAPI)
-	motherDir := learnadapter.NewMotherDirectoryAdapter(motherRepo)
-	linkHandler := learncommand.NewLinkUsersHandler(learnReadModel, motherDir)
+
+	donorHandler := wireDonor(db)
+	reportHandler := wireReport(db)
+	userHandler := wireUser(db, cfg)
+
+	syncHandler, linkHandler := wireLearn(db, motherDirectory, cfg)
 
 	return &DependencyContainer{
 		routers: []httpx.Router{
@@ -170,8 +104,137 @@ func NewDependencyContainer(cfg Config, conns *ConnectionContainer) *DependencyC
 			donorHandler, reportHandler, userHandler,
 		},
 		filesDir:    cfg.FilesDir,
-		learnWorker: NewLearnSyncWorker(syncHandler, linkHandler, learnAPI != nil, 5*time.Minute),
+		learnWorker: NewLearnSyncWorker(syncHandler, linkHandler, isLearnEnabled(cfg), 5*time.Minute),
+	}, nil
+}
+
+func wireMother(db *sql.DB, filesDir string) (motherDirectory *motheradapter.MotherDirectory, handler httpx.Router) {
+	motherRepo := mothermysql.NewRepository(db)
+	learnReadModel := learnmysql.NewReadModel(db)
+	learnStatsAdapter := motheradapter.NewLearnStatsAdapter(learnReadModel)
+	motherReads := mothermysql.NewReadModel(db, learnStatsAdapter)
+	photoStorage := motherstorage.NewLocalStorage(filesDir)
+
+	handler = motherhttp.NewHandler(
+		mothercommand.NewCreateHandler(motherRepo),
+		mothercommand.NewUploadPhotoHandler(motherRepo, photoStorage, motherReads),
+		motherquery.NewGetCoursesHandler(motherReads, learnStatsAdapter),
+		motherquery.NewGetIPRHandler(motherReads, learnStatsAdapter),
+		motherReads,
+	)
+	motherDirectory = motheradapter.NewMotherDirectory(motherReads)
+	return
+}
+
+func wireSecretInfo(db *sql.DB, mothers *motheradapter.MotherDirectory) httpx.Router {
+	watchingRepo := watchingmysql.NewRepo(db)
+	secretService := secretInfo.NewService(secretinfomysql.NewRepo(db), mothers, watchingRepo)
+	return secretinfoapi.New(secretService)
+}
+
+func wireHelp(db *sql.DB, mothers *motheradapter.MotherDirectory) (handler httpx.Router, service *help.Service) {
+	service = help.NewService(helpmysql.NewRepo(db), mothers)
+	return helpapi.New(service), service
+}
+
+func wireChild(db *sql.DB, mothers *motheradapter.MotherDirectory) httpx.Router {
+	return childapi.New(child.NewService(childmysql.NewRepo(db), mothers))
+}
+
+func wireEvent(db *sql.DB, mothers *motheradapter.MotherDirectory) httpx.Router {
+	eventRepo := eventmysql.NewRepository(db)
+	eventUoW := eventmysql.NewUnitOfWork(db)
+	eventReads := eventmysql.NewReadModel(db)
+	return eventhttp.NewHandler(
+		eventcommand.NewCreateEventHandler(eventRepo),
+		eventcommand.NewRegisterHandler(eventUoW, mothers),
+		eventcommand.NewMarkHandler(eventUoW),
+		eventReads,
+	)
+}
+
+func wireProfile(db *sql.DB, mothers *motheradapter.MotherDirectory, now func() time.Time) httpx.Router {
+	profileRepo := profilemysql.NewRepository(db)
+	profileReads := profilemysql.NewReadModel(db)
+	return profilehttp.NewHandler(
+		profilecommand.NewSaveHandler(profileRepo, mothers, now),
+		profilecommand.NewSetStatusHandler(profileRepo),
+		profileReads,
+	)
+}
+
+func wireLifecycle(db *sql.DB, mothers *motheradapter.MotherDirectory) httpx.Router {
+	lifecycleRepo := lifecyclemysql.NewRepository(db)
+	lifecycleReads := lifecyclemysql.NewReadModel(db)
+	return lifecyclehttp.NewHandler(
+		lifecyclecommand.NewChangeHandler(lifecycleRepo, mothers),
+		lifecycleReads,
+	)
+}
+
+func wireRequest(db *sql.DB, mothers *motheradapter.MotherDirectory, helps *help.Service, now func() time.Time) (httpx.Router, error) {
+	requestRepo := requestmysql.NewRepository(db)
+	requestUoW := requestmysql.NewUnitOfWork(db)
+	requestReads := requestmysql.NewReadModel(db)
+	requestHelps := requestadapter.NewHelpDirectory(helps)
+	return requesthttp.NewHandler(
+		requestcommand.NewCreateRequestHandler(requestRepo, mothers, now),
+		requestcommand.NewChangeStatusHandler(requestUoW, now),
+		requestcommand.NewFulfillRequestHandler(requestUoW, requestHelps, now),
+		requestReads,
+	), nil
+}
+
+func wireDocument(db *sql.DB, filesDir string, mothers *motheradapter.MotherDirectory, helps *help.Service) (httpx.Router, error) {
+	documentStorage, err := documentstorage.NewLocal(filesDir)
+	if err != nil {
+		return nil, err
 	}
+	documentRepo := documentmysql.NewRepository(db)
+	documentReads := documentmysql.NewReadModel(db)
+	documentHelps := documentadapter.NewHelpDirectory(helps)
+	return documenthttp.NewHandler(
+		documentcommand.NewCreateHandler(documentRepo, mothers, documentHelps),
+		documentcommand.NewAttachFileHandler(documentRepo, documentStorage),
+		documentcommand.NewDownloadHandler(documentRepo, documentStorage),
+		documentcommand.NewSignHandler(documentRepo),
+		documentReads,
+	), nil
+}
+
+func wireDonor(db *sql.DB) httpx.Router {
+	return donorapi.New(donor.NewService(donormysql.NewRepo(db)))
+}
+
+func wireReport(db *sql.DB) httpx.Router {
+	return reportapi.New(report.NewService(reportmysql.NewRepo(db)))
+}
+
+func wireUser(db *sql.DB, cfg Config) httpx.Router {
+	return userapi.New(user.NewService(usermysql.NewRepo(db), cfg.AuthSecret, cfg.AuthTTL))
+}
+
+func wireLearn(db *sql.DB, mothers *motheradapter.MotherDirectory, cfg Config) (syncHandler learncommand.SyncAll, linkHandler learncommand.LinkUsers) {
+	learnWriteRepo := learnmysql.NewWriteRepo(db)
+	learnReadModel := learnmysql.NewReadModel(db)
+
+	var learnAPI learndomain.APIClient
+	if cfg.Learn.Enabled() {
+		learnAPI = learnclient.NewClient(cfg.Learn.BaseURL, cfg.Learn.ClientID, cfg.Learn.ClientSecret)
+		log.Println("Learn API клиент настроен (OAuth 2.0)")
+	} else {
+		log.Println("Learn API не настроен: укажите LEARN_API_BASE_URL, LEARN_API_CLIENT_ID и LEARN_API_CLIENT_SECRET в .env")
+	}
+
+	syncHandler = learncommand.NewSyncHandler(learnWriteRepo, learnAPI)
+	motherDir := learnadapter.NewMotherDirectoryAdapter(mothermysql.NewReadModel(db, motheradapter.NewLearnStatsAdapter(learnReadModel)))
+	linkRepo := learnmysql.NewMotherLearnLinkRepo(db)
+	linkHandler = learncommand.NewLinkUsersHandler(learnReadModel, motherDir, linkRepo)
+	return
+}
+
+func isLearnEnabled(cfg Config) bool {
+	return cfg.Learn.Enabled()
 }
 
 func (d *DependencyContainer) Routers() []httpx.Router        { return d.routers }

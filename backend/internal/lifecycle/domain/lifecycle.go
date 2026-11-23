@@ -43,18 +43,15 @@ type Change struct {
 	createdAt time.Time
 }
 
-func newChange(motherID int, status Status, reason string) Change {
+func newChange(motherID int, status Status, reason string, now time.Time) Change {
 	return Change{
 		motherID:  motherID,
 		status:    status,
 		reason:    strings.TrimSpace(reason),
-		createdAt: time.Now(),
+		createdAt: now,
 	}
 }
 
-func (c *Change) SetID(id int) {
-	c.id = id
-}
 
 func (c Change) ID() int             { return c.id }
 func (c Change) MotherID() int       { return c.motherID }
@@ -79,7 +76,7 @@ func NewStatusHistory(motherID int) (StatusHistory, error) {
 	}, nil
 }
 
-func (h *StatusHistory) Transition(to Status, reason string) error {
+func (h *StatusHistory) Transition(to Status, reason string, now time.Time) error {
 	if !to.Valid() {
 		return ErrStatus
 	}
@@ -90,7 +87,7 @@ func (h *StatusHistory) Transition(to Status, reason string) error {
 		return ErrReason
 	}
 	h.current = to
-	h.history = append(h.history, newChange(h.motherID, to, reason))
+	h.history = append(h.history, newChange(h.motherID, to, reason, now))
 	return nil
 }
 

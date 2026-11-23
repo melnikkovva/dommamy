@@ -18,6 +18,21 @@ func (s ParticipationStatus) Valid() bool {
 	return slices.Contains([]ParticipationStatus{StatusRegistered, StatusCame, StatusAbsent}, s)
 }
 
+var participationTransitions = map[ParticipationStatus][]ParticipationStatus{
+	StatusRegistered: {StatusCame, StatusAbsent},
+	StatusCame:       {StatusAbsent},
+	StatusAbsent:     {StatusRegistered, StatusCame},
+}
+
+func CanParticipationTransition(from, to ParticipationStatus) bool {
+	for _, next := range participationTransitions[from] {
+		if next == to {
+			return true
+		}
+	}
+	return false
+}
+
 type Event struct {
 	id        int
 	typeID    int
@@ -44,9 +59,6 @@ func NewEvent(typeID int, title string, startsAt time.Time, place string, maxPeo
 	}, nil
 }
 
-func (e *Event) SetID(id int) {
-	e.id = id
-}
 
 func (e Event) ID() int        { return e.id }
 func (e Event) TypeID() int    { return e.typeID }
@@ -54,6 +66,13 @@ func (e Event) Title() string  { return e.title }
 func (e Event) StartsAt() time.Time { return e.startsAt }
 func (e Event) Place() string  { return e.place }
 func (e Event) MaxPeople() int { return e.maxPeople }
+
+func (e Event) EnsureHasPlace(registered int) error {
+	if e.maxPeople > 0 && registered >= e.maxPeople {
+		return ErrFull
+	}
+	return nil
+}
 
 type Snapshot struct {
 	ID        int

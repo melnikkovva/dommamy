@@ -15,27 +15,26 @@ func NewRepository(db *sql.DB) *Repository {
 	return &Repository{db: db}
 }
 
-func (r *Repository) Add(ctx context.Context, c domain.Change) error {
+func (r *Repository) Add(ctx context.Context, c domain.Change) (int, error) {
 	res, err := r.db.ExecContext(
 		ctx,
 		"INSERT INTO mother_status_history (mother_id, status, reason, created_at) VALUES (?, ?, ?, ?)",
 		c.MotherID(), c.Status(), c.Reason(), c.CreatedAt(),
 	)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	id, err := res.LastInsertId()
 	if err != nil {
-		return err
+		return 0, err
 	}
-	c.SetID(int(id))
-	return nil
+	return int(id), nil
 }
 
 func (r *Repository) History(ctx context.Context, motherID int) ([]domain.ChangeSnapshot, error) {
 	rows, err := r.db.QueryContext(
 		ctx,
-		"SELECT id, mother_id, status, reason, created_at FROM mother_status_history WHERE mother_id = ? ORDER BY id DESC",
+ 	"SELECT id, mother_id, status, reason, created_at FROM mother_status_history WHERE mother_id = ? ORDER BY id ASC",
 		motherID,
 	)
 	if err != nil {

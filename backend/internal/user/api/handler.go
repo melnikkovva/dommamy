@@ -1,13 +1,10 @@
 package api
 
 import (
-	"encoding/json"
 	"errors"
-	"log"
 	"net/http"
-	"strconv"
-	"time"
 
+	"backend/internal/auth"
 	"backend/internal/user"
 	"backend/internal/shared/httpx"
 )
@@ -65,24 +62,27 @@ type createUserBody struct {
 func toUserResponse(u *user.User) userResponse {
 	return userResponse{
 		Id: u.Id, Login: u.Login, FirstName: u.FirstName, LastName: u.LastName,
-		Role: u.Role, MotherId: u.MotherId, CreatedAt: u.CreatedAt.Format(time.RFC3339),
+		Role: u.Role, MotherId: u.MotherId, CreatedAt: u.CreatedAt.Format(httpx.APITime),
 	}
 }
 
 func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
-	var req loginBody
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpx.WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect JSON"})
+	req, err := httpx.ReadJSON[loginBody](w, r)
+	if err != nil {
+		if httpx.IsMaxBytesExceeded(err) {
+			httpx.WriteError(w, http.StatusRequestEntityTooLarge, "request body too large")
+			return
+		}
+		httpx.WriteError(w, http.StatusBadRequest, "incorrect JSON")
 		return
 	}
 	token, u, err := h.s.Login(req.Login, req.Password)
 	if err != nil {
 		switch {
 		case errors.Is(err, user.ErrorInvalidCredentials):
-			httpx.WriteJSON(w, http.StatusUnauthorized, map[string]string{"error": "Неверный логин или пароль"})
+			httpx.WriteError(w, http.StatusUnauthorized, "Неверный логин или пароль")
 		default:
-			log.Println("error login:", err)
-			httpx.WriteJSON(w, http.StatusInternalServerError, map[string]string{"error": "something went wrong"})
+			httpx.WriteError(w, http.StatusInternalServerError, "something went wrong")
 		}
 		return
 	}
@@ -98,13 +98,22 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) me(w http.ResponseWriter, r *http.Request) {
-	httpx.WriteJSON(w, http.StatusOK, map[string]string{"message": "use login endpoint"})
+	httpx.WriteError(w, http.StatusOK, "use login endpoint")
 }
 
 func (h *Handler) createUser(w http.ResponseWriter, r *http.Request) {
-	var req createUserBody
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpx.WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect JSON"})
+	claims, err := auth.FromContext(r.Context())
+	if err != nil || claims.Role != user.RoleAdmin {
+		httpx.WriteError(w, http.StatusForbidden, "только администратор может создавать пользователей")
+		return
+	}
+	req, err := httpx.ReadJSON[createUserBody](w, r)
+	if err != nil {
+		if httpx.IsMaxBytesExceeded(err) {
+			httpx.WriteError(w, http.StatusRequestEntityTooLarge, "request body too large")
+			return
+		}
+		httpx.WriteError(w, http.StatusBadRequest, "incorrect JSON")
 		return
 	}
 	if req.Role == "" {
@@ -114,13 +123,12 @@ func (h *Handler) createUser(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		switch {
 		case errors.Is(err, user.ErrorLoginTaken):
-			httpx.WriteJSON(w, http.StatusConflict, map[string]string{"error": "Логин уже занят"})
+			httpx.WriteError(w, http.StatusConflict, "Логин уже занят")
 		case errors.Is(err, user.ErrorLogin), errors.Is(err, user.ErrorPassword),
 			errors.Is(err, user.ErrorName), errors.Is(err, user.ErrorSurname):
-			httpx.WriteJSON(w, http.StatusUnprocessableEntity, map[string]string{"error": err.Error()})
+			httpx.WriteError(w, http.StatusUnprocessableEntity, err.Error())
 		default:
-			log.Println("error create user:", err)
-			httpx.WriteJSON(w, http.StatusInternalServerError, map[string]string{"error": "something went wrong"})
+			httpx.WriteError(w, http.StatusInternalServerError, "something went wrong")
 		}
 		return
 	}
@@ -128,10 +136,14 @@ func (h *Handler) createUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) listUsers(w http.ResponseWriter, r *http.Request) {
+	claims, err := auth.FromContext(r.Context())
+	if err != nil || claims.Role != user.RoleAdmin {
+		httpx.WriteError(w, http.StatusForbidden, "forbidden")
+		return
+	}
 	items, err := h.s.ListUsers()
 	if err != nil {
-		log.Println("error list users:", err)
-		httpx.WriteJSON(w, http.StatusInternalServerError, map[string]string{"error": "something went wrong"})
+		httpx.WriteError(w, http.StatusInternalServerError, "something went wrong")
 		return
 	}
 	result := []userResponse{}
@@ -142,19 +154,23 @@ func (h *Handler) listUsers(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) getUser(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.PathValue("id"))
+	claims, ctxErr := auth.FromContext(r.Context())
+	id, err := httpx.PathID(r, "id")
 	if err != nil {
-		httpx.WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect id"})
+		httpx.WriteError(w, http.StatusBadRequest, "incorrect id")
+		return
+	}
+	if ctxErr != nil || (claims.Role != user.RoleAdmin && claims.UserID != id) {
+		httpx.WriteError(w, http.StatusForbidden, "forbidden")
 		return
 	}
 	u, err := h.s.GetUser(id)
 	if err != nil {
 		switch {
 		case errors.Is(err, user.ErrorNotFound):
-			httpx.WriteJSON(w, http.StatusNotFound, map[string]string{"error": "user not found"})
+			httpx.WriteError(w, http.StatusNotFound, "user not found")
 		default:
-			log.Println("error get user:", err)
-			httpx.WriteJSON(w, http.StatusInternalServerError, map[string]string{"error": "something went wrong"})
+			httpx.WriteError(w, http.StatusInternalServerError, "something went wrong")
 		}
 		return
 	}

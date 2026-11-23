@@ -41,6 +41,9 @@ func LoadConfig() (Config, error) {
 	if cfg.DatabaseURL == "" {
 		return Config{}, errors.New("DATABASE_URL is not set")
 	}
+	if len(cfg.AuthSecret) < 32 {
+		return Config{}, errors.New("AUTH_SECRET must be set and at least 32 characters long")
+	}
 	return cfg, nil
 }
 

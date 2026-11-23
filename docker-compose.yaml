@@ -28,6 +28,7 @@ services:
       HTTP_ADDR: 127.0.0.1:8080
       DATABASE_URL: fund:${DB_PASSWORD}@tcp(127.0.0.1:3306)/fund?parseTime=true&charset=utf8mb4
       FILES_DIR: /app/uploads
+      AUTH_SECRET: ${AUTH_SECRET}
       LEARN_API_BASE_URL: ${LEARN_API_BASE_URL}
       LEARN_API_CLIENT_ID: ${LEARN_API_CLIENT_ID}
       LEARN_API_CLIENT_SECRET: ${LEARN_API_CLIENT_SECRET}

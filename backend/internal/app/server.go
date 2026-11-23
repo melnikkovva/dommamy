@@ -7,6 +7,9 @@ import (
 	"net/http"
 	"path/filepath"
 	"time"
+
+	"backend/internal/auth"
+	"backend/internal/shared/httpx"
 )
 
 type Server struct {
@@ -15,13 +18,30 @@ type Server struct {
 
 func NewServer(cfg Config, deps *DependencyContainer) *Server {
 	mux := http.NewServeMux()
-	for _, r := range deps.Routers() {
-		r.Register(mux)
-	}
-	// TODO: перенести в контекст document
-	mux.Handle("GET /api/photos/{path...}", photosHandler(deps.FilesDir()))
 
-	return &Server{srv: &http.Server{Addr: cfg.HTTPAddr, Handler: mux}}
+	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
+		httpx.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	})
+
+	apiMux := http.NewServeMux()
+	for _, r := range deps.Routers() {
+		r.Register(apiMux)
+	}
+	apiMux.Handle("GET /api/photos/{path...}", photosHandler(deps.FilesDir()))
+
+	apiHandler := httpx.LoggingMiddleware(apiMux)
+	apiHandler = httpx.RecoverMiddleware(apiHandler)
+	apiHandler = auth.Middleware([]byte(cfg.AuthSecret))(apiHandler)
+
+	mux.Handle("/", apiHandler)
+
+	return &Server{srv: &http.Server{
+		Addr:              cfg.HTTPAddr,
+		Handler:           mux,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       10 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}}
 }
 
 func (s *Server) Run(ctx context.Context) error {

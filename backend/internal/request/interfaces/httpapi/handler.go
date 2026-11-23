@@ -1,12 +1,10 @@
 package httpapi
 
 import (
-	"errors"
-	"log"
 	"net/http"
-	"slices"
 	"time"
 
+	"backend/internal/auth"
 	"backend/internal/request/application/command"
 	"backend/internal/request/application/query"
 	"backend/internal/request/domain"
@@ -19,7 +17,18 @@ func NewHandler(
 	fulfill command.FulfillRequestHandler,
 	reads query.ReadModel,
 ) httpx.Router {
-	return &handler{create: create, changeStatus: changeStatus, fulfill: fulfill, reads: reads}
+	return &handler{
+		create: create, changeStatus: changeStatus, fulfill: fulfill, reads: reads,
+		mapper: httpx.NewErrorMapper(
+			httpx.WithNotFound(domain.ErrNotFound),
+			httpx.WithValidation(
+				domain.ErrMotherNotSpecified, domain.ErrMotherNotFound, domain.ErrInvalidKind,
+				domain.ErrInvalidSource, domain.ErrInvalidStatus, domain.ErrTransition,
+				domain.ErrCommentRequired, domain.ErrUseFulfill, domain.ErrHelpNotFound,
+				domain.ErrHelpMismatch,
+			),
+		),
+	}
 }
 
 type handler struct {
@@ -27,6 +36,7 @@ type handler struct {
 	changeStatus command.ChangeStatusHandler
 	fulfill      command.FulfillRequestHandler
 	reads        query.ReadModel
+	mapper       *httpx.ErrorMapper
 }
 
 func (h *handler) Register(mux *http.ServeMux) {
@@ -82,8 +92,12 @@ type issueBody struct {
 }
 
 func (h *handler) createRequest(w http.ResponseWriter, r *http.Request) {
-	body, err := httpx.ReadJSON[createBody](r)
+	body, err := httpx.ReadJSON[createBody](w, r)
 	if err != nil {
+		if httpx.IsMaxBytesExceeded(err) {
+			httpx.WriteError(w, http.StatusRequestEntityTooLarge, "request body too large")
+			return
+		}
 		httpx.WriteError(w, http.StatusBadRequest, "incorrect JSON")
 		return
 	}
@@ -94,7 +108,7 @@ func (h *handler) createRequest(w http.ResponseWriter, r *http.Request) {
 		Source:      string(domain.SourceStaff),
 	})
 	if err != nil {
-		fail(w, "create request", err)
+		h.mapper.Handle(w, "create request", err)
 		return
 	}
 	h.respondWith(w, r, http.StatusCreated, id)
@@ -103,7 +117,7 @@ func (h *handler) createRequest(w http.ResponseWriter, r *http.Request) {
 func (h *handler) list(w http.ResponseWriter, r *http.Request) {
 	items, err := h.reads.List(r.Context(), r.URL.Query().Get("status"))
 	if err != nil {
-		fail(w, "list requests", err)
+		h.mapper.Handle(w, "list requests", err)
 		return
 	}
 	httpx.WriteJSON(w, http.StatusOK, toResponses(items))
@@ -115,9 +129,12 @@ func (h *handler) byMother(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusBadRequest, "incorrect id")
 		return
 	}
+	if !auth.RequireOwnershipOrAdmin(w, r, motherID) {
+		return
+	}
 	items, err := h.reads.ByMother(r.Context(), motherID)
 	if err != nil {
-		fail(w, "requests by mother", err)
+		h.mapper.Handle(w, "requests by mother", err)
 		return
 	}
 	httpx.WriteJSON(w, http.StatusOK, toResponses(items))
@@ -129,14 +146,18 @@ func (h *handler) setStatus(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusBadRequest, "incorrect id")
 		return
 	}
-	body, err := httpx.ReadJSON[statusBody](r)
+	body, err := httpx.ReadJSON[statusBody](w, r)
 	if err != nil {
+		if httpx.IsMaxBytesExceeded(err) {
+			httpx.WriteError(w, http.StatusRequestEntityTooLarge, "request body too large")
+			return
+		}
 		httpx.WriteError(w, http.StatusBadRequest, "incorrect JSON")
 		return
 	}
 	err = h.changeStatus.Handle(r.Context(), command.ChangeStatus{RequestID: id, Status: body.Status, Comment: body.Comment})
 	if err != nil {
-		fail(w, "set request status", err)
+		h.mapper.Handle(w, "set request status", err)
 		return
 	}
 	h.respondWith(w, r, http.StatusOK, id)
@@ -148,13 +169,17 @@ func (h *handler) issue(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusBadRequest, "incorrect id")
 		return
 	}
-	body, err := httpx.ReadJSON[issueBody](r)
+	body, err := httpx.ReadJSON[issueBody](w, r)
 	if err != nil {
+		if httpx.IsMaxBytesExceeded(err) {
+			httpx.WriteError(w, http.StatusRequestEntityTooLarge, "request body too large")
+			return
+		}
 		httpx.WriteError(w, http.StatusBadRequest, "incorrect JSON")
 		return
 	}
 	if err := h.fulfill.Handle(r.Context(), command.FulfillRequest{RequestID: id, HelpID: body.HelpID}); err != nil {
-		fail(w, "fulfill request", err)
+		h.mapper.Handle(w, "fulfill request", err)
 		return
 	}
 	h.respondWith(w, r, http.StatusOK, id)
@@ -163,27 +188,8 @@ func (h *handler) issue(w http.ResponseWriter, r *http.Request) {
 func (h *handler) respondWith(w http.ResponseWriter, r *http.Request, status, id int) {
 	v, err := h.reads.Get(r.Context(), id)
 	if err != nil {
-		fail(w, "get request", err)
+		h.mapper.Handle(w, "get request", err)
 		return
 	}
 	httpx.WriteJSON(w, status, toResponse(v))
-}
-
-var validationErrors = []error{
-	domain.ErrMotherNotSpecified, domain.ErrMotherNotFound, domain.ErrInvalidKind,
-	domain.ErrInvalidSource, domain.ErrInvalidStatus, domain.ErrTransition,
-	domain.ErrCommentRequired, domain.ErrUseFulfill, domain.ErrHelpNotFound,
-	domain.ErrHelpMismatch,
-}
-
-func fail(w http.ResponseWriter, where string, err error) {
-	switch {
-	case errors.Is(err, domain.ErrNotFound):
-		httpx.WriteError(w, http.StatusNotFound, err.Error())
-	case slices.ContainsFunc(validationErrors, func(e error) bool { return errors.Is(err, e) }):
-		httpx.WriteError(w, http.StatusUnprocessableEntity, err.Error())
-	default:
-		log.Println("error", where+":", err)
-		httpx.WriteError(w, http.StatusInternalServerError, "something went wrong")
-	}
 }

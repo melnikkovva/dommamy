@@ -3,6 +3,7 @@ package mysql
 import (
 	"context"
 	"database/sql"
+	"errors"
 
 	"backend/internal/profile/application/query"
 	"backend/internal/profile/domain"
@@ -35,6 +36,9 @@ func (r *readModel) GetByMother(ctx context.Context, motherID int) (query.Profil
 		&v.IncomeAmount, &v.MaritalStatus, &v.FatherInfo, &v.PregnancyWeeks,
 		&v.Situation, &v.ExpectedHelp, &v.Source, &statusStr, &updatedAt,
 	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return query.ProfileView{}, domain.ErrNotFilled
+	}
 	if err != nil {
 		return query.ProfileView{}, err
 	}

@@ -64,7 +64,7 @@ func (r *repository) ByMother(ctx context.Context, motherID int) (domain.Profile
 		&s.Situation, &s.ExpectedHelp, &s.Source, &statusStr, &updatedAt,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
-		return domain.Profile{}, nil
+		return domain.Profile{}, domain.ErrNotFilled
 	}
 	if err != nil {
 		return domain.Profile{}, err

@@ -68,43 +68,58 @@ func NewProfile(motherID int) (Profile, error) {
 	}, nil
 }
 
-func (p *Profile) SetID(id int) {
+type ProfileInput struct {
+	BirthDate      string
+	BirthPlace     string
+	Citizenship    string
+	Registration   string
+	Living         string
+	Email          string
+	Religion       string
+	Education      string
+	Profession     string
+	IncomeSource   string
+	IncomeAmount   int
+	MaritalStatus  string
+	FatherInfo     string
+	PregnancyWeeks int
+	Situation      string
+	ExpectedHelp   string
+	Source         string
 }
 
-func (p *Profile) Fill(birthDate, birthPlace, citizenship, registration, living, email,
-	religion, education, profession, incomeSource, maritalStatus, fatherInfo, source string,
-	incomeAmount, pregnancyWeeks int, situation, expectedHelp string) error {
-
-	p.birthDate = strings.TrimSpace(birthDate)
+func (p *Profile) Fill(input ProfileInput, now time.Time) error {
+	p.birthDate = strings.TrimSpace(input.BirthDate)
 	if p.birthDate != "" {
 		d, err := time.Parse("2006-01-02", p.birthDate)
-		if err != nil || d.After(time.Now()) {
+		if err != nil || d.After(now) {
 			return ErrBirth
 		}
 	}
 
-	p.birthPlace = strings.TrimSpace(birthPlace)
-	p.citizenship = strings.TrimSpace(citizenship)
-	p.registration = strings.TrimSpace(registration)
-	p.living = strings.TrimSpace(living)
-	p.email = strings.TrimSpace(email)
-	p.religion = strings.TrimSpace(religion)
-	p.education = strings.TrimSpace(education)
-	p.profession = strings.TrimSpace(profession)
-	p.incomeSource = strings.TrimSpace(incomeSource)
-	p.incomeAmount = incomeAmount
+	p.birthPlace = strings.TrimSpace(input.BirthPlace)
+	p.citizenship = strings.TrimSpace(input.Citizenship)
+	p.registration = strings.TrimSpace(input.Registration)
+	p.living = strings.TrimSpace(input.Living)
+	p.email = strings.TrimSpace(input.Email)
+	p.religion = strings.TrimSpace(input.Religion)
+	p.education = strings.TrimSpace(input.Education)
+	p.profession = strings.TrimSpace(input.Profession)
+	p.incomeSource = strings.TrimSpace(input.IncomeSource)
+	p.incomeAmount = input.IncomeAmount
 	if p.incomeAmount < 0 {
 		return ErrIncome
 	}
-	p.maritalStatus = strings.TrimSpace(maritalStatus)
-	p.fatherInfo = strings.TrimSpace(fatherInfo)
-	p.pregnancyWeeks = pregnancyWeeks
+	p.maritalStatus = strings.TrimSpace(input.MaritalStatus)
+	p.fatherInfo = strings.TrimSpace(input.FatherInfo)
+	p.pregnancyWeeks = input.PregnancyWeeks
 	if p.pregnancyWeeks < 0 || p.pregnancyWeeks > 42 {
 		return ErrWeeks
 	}
-	p.situation = strings.TrimSpace(situation)
-	p.expectedHelp = strings.TrimSpace(expectedHelp)
-	p.source = strings.TrimSpace(source)
+	p.situation = strings.TrimSpace(input.Situation)
+	p.expectedHelp = strings.TrimSpace(input.ExpectedHelp)
+	p.source = strings.TrimSpace(input.Source)
+	p.updatedAt = now
 
 	return nil
 }
@@ -150,11 +165,7 @@ func (p Profile) Situation() string        { return p.situation }
 func (p Profile) ExpectedHelp() string     { return p.expectedHelp }
 func (p Profile) Source() string           { return p.source }
 func (p Profile) Status() Status           { return p.status }
-func (p Profile) UpdatedAt() time.Time     { return p.updatedAt }
-
-func (p *Profile) SetUpdatedAt(t time.Time) {
-	p.updatedAt = t
-}
+func (p Profile) UpdatedAt() time.Time { return p.updatedAt }
 
 type Snapshot struct {
 	MotherID       int

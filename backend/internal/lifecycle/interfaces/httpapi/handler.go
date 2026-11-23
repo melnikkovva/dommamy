@@ -1,10 +1,9 @@
 package httpapi
 
 import (
-	"errors"
-	"log"
 	"net/http"
 
+	"backend/internal/auth"
 	lifecyclecommand "backend/internal/lifecycle/application/command"
 	lifecyclequery "backend/internal/lifecycle/application/query"
 	"backend/internal/lifecycle/domain"
@@ -14,6 +13,7 @@ import (
 type Handler struct {
 	changeHandler lifecyclecommand.ChangeHandler
 	reads         lifecyclequery.ReadModel
+	mapper        *httpx.ErrorMapper
 }
 
 func NewHandler(
@@ -23,6 +23,13 @@ func NewHandler(
 	return &Handler{
 		changeHandler: change,
 		reads:         reads,
+		mapper: httpx.NewErrorMapper(
+			httpx.WithValidation(
+				domain.ErrMother, domain.ErrNoMother,
+				domain.ErrStatus, domain.ErrTransition,
+				domain.ErrReason,
+			),
+		),
 	}
 }
 
@@ -40,13 +47,16 @@ type changeRequest struct {
 func (h *Handler) get(w http.ResponseWriter, r *http.Request) {
 	motherID, err := httpx.PathID(r, "id")
 	if err != nil {
-		httpx.WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect id"})
+		httpx.WriteError(w, http.StatusBadRequest, "incorrect id")
+		return
+	}
+	if !auth.RequireOwnershipOrAdmin(w, r, motherID) {
 		return
 	}
 
 	view, err := h.reads.GetStatus(r.Context(), motherID)
 	if err != nil {
-		fail(w, "get status", err)
+		h.mapper.Handle(w, "get status", err)
 		return
 	}
 
@@ -56,13 +66,20 @@ func (h *Handler) get(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) change(w http.ResponseWriter, r *http.Request) {
 	motherID, err := httpx.PathID(r, "id")
 	if err != nil {
-		httpx.WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect id"})
+		httpx.WriteError(w, http.StatusBadRequest, "incorrect id")
+		return
+	}
+	if !auth.RequireOwnershipOrAdmin(w, r, motherID) {
 		return
 	}
 
-	req, err := httpx.ReadJSON[changeRequest](r)
+	req, err := httpx.ReadJSON[changeRequest](w, r)
 	if err != nil {
-		httpx.WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect JSON"})
+		if httpx.IsMaxBytesExceeded(err) {
+			httpx.WriteError(w, http.StatusRequestEntityTooLarge, "request body too large")
+			return
+		}
+		httpx.WriteError(w, http.StatusBadRequest, "incorrect JSON")
 		return
 	}
 
@@ -71,7 +88,7 @@ func (h *Handler) change(w http.ResponseWriter, r *http.Request) {
 		Status:   req.Status,
 		Reason:   req.Reason,
 	}); err != nil {
-		fail(w, "change status", err)
+		h.mapper.Handle(w, "change status", err)
 		return
 	}
 
@@ -81,21 +98,9 @@ func (h *Handler) change(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) all(w http.ResponseWriter, r *http.Request) {
 	items, err := h.reads.Currents(r.Context())
 	if err != nil {
-		fail(w, "currents", err)
+		h.mapper.Handle(w, "currents", err)
 		return
 	}
 
 	httpx.WriteJSON(w, http.StatusOK, items)
-}
-
-func fail(w http.ResponseWriter, where string, err error) {
-	switch {
-	case errors.Is(err, domain.ErrMother), errors.Is(err, domain.ErrNoMother),
-		errors.Is(err, domain.ErrStatus), errors.Is(err, domain.ErrTransition),
-		errors.Is(err, domain.ErrReason):
-		httpx.WriteError(w, http.StatusUnprocessableEntity, err.Error())
-	default:
-		log.Println("error", where+":", err)
-		httpx.WriteError(w, http.StatusInternalServerError, "something went wrong")
-	}
 }

@@ -13,7 +13,7 @@ type Data struct {
 	UpdatedAt time.Time
 }
 
-func AddNew(motherId int, criminal, ndPnd, drugs, chronic string) (*Data, error) {
+func AddNew(motherId int, criminal, ndPnd, drugs, chronic string, now time.Time) (*Data, error) {
 	if motherId <= 0 {
 		return nil, ErrorMother
 	}
@@ -23,6 +23,6 @@ func AddNew(motherId int, criminal, ndPnd, drugs, chronic string) (*Data, error)
 		NdPnd: ndPnd,
 		Drugs: drugs,
 		ChronicDiseases: chronic,
-		UpdatedAt: time.Now(),
+		UpdatedAt: now,
 	}, nil
 }

@@ -4,9 +4,7 @@ CREATE TABLE IF NOT EXISTS mother (
     last_name VARCHAR(50) NOT NULL, 
     phone VARCHAR(20) NOT NULL DEFAULT '', 
     email VARCHAR(255) NOT NULL DEFAULT '', 
-    learn_user_id VARCHAR(50) NULL,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (learn_user_id) REFERENCES lms_learners(user_id)
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS help_items (
@@ -172,6 +170,15 @@ CREATE TABLE IF NOT EXISTS lms_learners (
     last_login_date DATETIME,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS mother_learn_link (
+    mother_id INT NOT NULL,
+    learn_user_id VARCHAR(50) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (mother_id),
+    FOREIGN KEY (mother_id) REFERENCES mother(id),
+    FOREIGN KEY (learn_user_id) REFERENCES lms_learners(user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS lms_course_results (

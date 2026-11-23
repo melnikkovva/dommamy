@@ -10,7 +10,6 @@ type APIClient interface {
 
 type MotherDirectory interface {
 	GetAllMothers(ctx context.Context) ([]MotherRef, error)
-	UpdateLearnUserID(ctx context.Context, id int, learnUserID string) error
 }
 
 type MotherRef struct {

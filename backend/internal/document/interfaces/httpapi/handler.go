@@ -1,14 +1,15 @@
 package httpapi
 
 import (
-	"errors"
 	"io"
 	"log"
 	"mime"
 	"net/http"
+	"path"
 	"slices"
-	"time"
+	"strings"
 
+	"backend/internal/auth"
 	"backend/internal/document/application/command"
 	"backend/internal/document/application/query"
 	"backend/internal/document/domain"
@@ -22,12 +23,22 @@ func NewHandler(
 	sign command.SignHandler,
 	reads query.ReadModel,
 ) httpx.Router {
- return &handler{
+	return &handler{
 		createCmd:    create,
 		attachFile:   attachFile,
 		downloadCmd:  download,
 		signCmd:      sign,
 		reads:        reads,
+		mapper: httpx.NewErrorMapper(
+			httpx.WithNotFound(domain.ErrNotFound),
+			httpx.WithValidation(
+				domain.ErrMother, domain.ErrNoMother, domain.ErrType,
+				domain.ErrNeedHelp, domain.ErrHelpNotAllowed, domain.ErrNoHelp,
+				domain.ErrHelpMismatch, domain.ErrDuplicate, domain.ErrSigned,
+				domain.ErrNoFile, domain.ErrEmptyFile, domain.ErrTooBig,
+				domain.ErrFileType, domain.ErrSignDate,
+			),
+		),
 	}
 }
 
@@ -37,6 +48,7 @@ type handler struct {
 	downloadCmd  command.DownloadHandler
 	signCmd      command.SignHandler
 	reads        query.ReadModel
+	mapper       *httpx.ErrorMapper
 }
 
 func (h *handler) Register(mux *http.ServeMux) {
@@ -66,7 +78,7 @@ func toResponse(v query.DocumentView) documentResponse {
 		ID: v.ID, MotherID: v.MotherID, Type: string(v.Type), HelpID: v.HelpID,
 		Status: string(v.Status), SignedAt: v.SignedAt, HasFile: v.HasFile,
 		OriginalName: v.OriginalName, ContentType: v.ContentType, Size: v.Size,
-		CreatedAt: v.CreatedAt.Format(time.RFC3339),
+		CreatedAt: v.CreatedAt.Format(httpx.APITime),
 	}
 }
 
@@ -93,8 +105,15 @@ func (h *handler) create(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusBadRequest, "incorrect id")
 		return
 	}
-	body, err := httpx.ReadJSON[createBody](r)
+	if !auth.RequireOwnershipOrAdmin(w, r, motherID) {
+		return
+	}
+	body, err := httpx.ReadJSON[createBody](w, r)
 	if err != nil {
+		if httpx.IsMaxBytesExceeded(err) {
+			httpx.WriteError(w, http.StatusRequestEntityTooLarge, "request body too large")
+			return
+		}
 		httpx.WriteError(w, http.StatusBadRequest, "incorrect JSON")
 		return
 	}
@@ -104,7 +123,7 @@ func (h *handler) create(w http.ResponseWriter, r *http.Request) {
 		HelpID:   body.HelpID,
 	})
 	if err != nil {
-		fail(w, "create document", err)
+		h.mapper.Handle(w, "create document", err)
 		return
 	}
 	h.respondWith(w, r, http.StatusCreated, id)
@@ -116,9 +135,12 @@ func (h *handler) list(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusBadRequest, "incorrect id")
 		return
 	}
+	if !auth.RequireOwnershipOrAdmin(w, r, motherID) {
+		return
+	}
 	items, err := h.reads.ByMother(r.Context(), motherID)
 	if err != nil {
-		fail(w, "list documents", err)
+		h.mapper.Handle(w, "list documents", err)
 		return
 	}
 	httpx.WriteJSON(w, http.StatusOK, toResponses(items))
@@ -141,12 +163,19 @@ func (h *handler) upload(w http.ResponseWriter, r *http.Request) {
 
 	head := make([]byte, 512)
 	n, _ := file.Read(head)
-	contentType := http.DetectContentType(head[:n])
+	sniffed := http.DetectContentType(head[:n])
+	if slices.Contains(domain.DeniedContentTypes(), sniffed) {
+		httpx.WriteError(w, http.StatusUnprocessableEntity, domain.ErrFileType.Error())
+		return
+	}
 	if _, err := file.Seek(0, io.SeekStart); err != nil {
 		log.Println("error seek upload:", err)
 		httpx.WriteError(w, http.StatusInternalServerError, "something went wrong")
 		return
 	}
+
+	ext := strings.ToLower(path.Ext(header.Filename))
+	contentType := domain.AllowedExtensions()[ext]
 
 	docID, err := h.attachFile.Handle(r.Context(), command.AttachFile{
 		DocumentID:   id,
@@ -156,7 +185,7 @@ func (h *handler) upload(w http.ResponseWriter, r *http.Request) {
 		OriginalName: header.Filename,
 	})
 	if err != nil {
-		fail(w, "upload file", err)
+		h.mapper.Handle(w, "upload file", err)
 		return
 	}
 	h.respondWith(w, r, http.StatusOK, docID)
@@ -171,7 +200,7 @@ func (h *handler) download(w http.ResponseWriter, r *http.Request) {
 
 	df, err := h.downloadCmd.Handle(r.Context(), command.Download{DocumentID: id})
 	if err != nil {
-		fail(w, "download file", err)
+		h.mapper.Handle(w, "download file", err)
 		return
 	}
 	defer df.Reader.Close()
@@ -188,8 +217,12 @@ func (h *handler) signDocument(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusBadRequest, "incorrect id")
 		return
 	}
-	body, err := httpx.ReadJSON[signBody](r)
+	body, err := httpx.ReadJSON[signBody](w, r)
 	if err != nil {
+		if httpx.IsMaxBytesExceeded(err) {
+			httpx.WriteError(w, http.StatusRequestEntityTooLarge, "request body too large")
+			return
+		}
 		httpx.WriteError(w, http.StatusBadRequest, "incorrect JSON")
 		return
 	}
@@ -198,7 +231,7 @@ func (h *handler) signDocument(w http.ResponseWriter, r *http.Request) {
 		SignedAt:   body.SignedAt,
 	})
 	if err != nil {
-		fail(w, "sign document", err)
+		h.mapper.Handle(w, "sign document", err)
 		return
 	}
 	h.respondWith(w, r, http.StatusOK, docID)
@@ -207,30 +240,8 @@ func (h *handler) signDocument(w http.ResponseWriter, r *http.Request) {
 func (h *handler) respondWith(w http.ResponseWriter, r *http.Request, status, id int) {
 	v, err := h.reads.GetByID(r.Context(), id)
 	if err != nil {
-		fail(w, "get document", err)
+		h.mapper.Handle(w, "get document", err)
 		return
 	}
 	httpx.WriteJSON(w, status, toResponse(v))
-}
-
-var validationErrors = []error{
-	domain.ErrMother, domain.ErrNoMother, domain.ErrType,
-	domain.ErrNeedHelp, domain.ErrHelpNotAllowed, domain.ErrNoHelp,
-	domain.ErrHelpMismatch, domain.ErrDuplicate, domain.ErrSigned,
-	domain.ErrNoFile, domain.ErrEmptyFile, domain.ErrTooBig,
-	domain.ErrFileType, domain.ErrSignDate,
-}
-
-func fail(w http.ResponseWriter, where string, err error) {
-	switch {
-	case errors.Is(err, domain.ErrNotFound):
-		httpx.WriteError(w, http.StatusNotFound, err.Error())
-	case slices.ContainsFunc(validationErrors, func(e error) bool {
-		return errors.Is(err, e)
-	}):
-		httpx.WriteError(w, http.StatusUnprocessableEntity, err.Error())
-	default:
-		log.Println("error", where+":", err)
-		httpx.WriteError(w, http.StatusInternalServerError, "something went wrong")
-	}
 }

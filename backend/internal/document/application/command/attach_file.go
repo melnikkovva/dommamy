@@ -5,6 +5,7 @@ import (
 	"io"
 
 	"backend/internal/document/domain"
+	"backend/internal/document/infrastructure/storage"
 )
 
 type AttachFile struct {
@@ -19,13 +20,13 @@ type AttachFileHandler interface {
 	Handle(ctx context.Context, cmd AttachFile) (int, error)
 }
 
-func NewAttachFileHandler(repo domain.Repository, storage domain.FileStorage) AttachFileHandler {
-	return &attachFileHandler{repo: repo, storage: storage}
+func NewAttachFileHandler(repo domain.Repository, fileStorage domain.FileStorage) AttachFileHandler {
+	return &attachFileHandler{repo: repo, fileStorage: fileStorage}
 }
 
 type attachFileHandler struct {
-	repo    domain.Repository
-	storage domain.FileStorage
+	repo        domain.Repository
+	fileStorage domain.FileStorage
 }
 
 func (h *attachFileHandler) Handle(ctx context.Context, cmd AttachFile) (int, error) {
@@ -36,7 +37,7 @@ func (h *attachFileHandler) Handle(ctx context.Context, cmd AttachFile) (int, er
 
 	oldFile := d.FileName()
 
-	stored, err := domain.NewStoredName(cmd.ContentType)
+	stored, err := storage.GenerateStoredName(cmd.ContentType)
 	if err != nil {
 		return 0, err
 	}
@@ -45,17 +46,17 @@ func (h *attachFileHandler) Handle(ctx context.Context, cmd AttachFile) (int, er
 		return 0, err
 	}
 
-	if err := h.storage.Put(stored, cmd.Content); err != nil {
+	if err := h.fileStorage.Put(stored, cmd.Content); err != nil {
 		return 0, err
 	}
 
 	if err := h.repo.Update(ctx, d); err != nil {
-		h.storage.Delete(stored)
+		h.fileStorage.Delete(stored)
 		return 0, err
 	}
 
 	if oldFile != "" {
-		h.storage.Delete(oldFile) 
+		h.fileStorage.Delete(oldFile) 
 	}
 
 	return d.ID(), nil

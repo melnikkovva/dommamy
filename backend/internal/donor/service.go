@@ -64,7 +64,7 @@ func (s *Service) List(q string) ([]*Summary, error) {
 }
 
 func (s *Service) AddDonation(donorId, amount int, date, comment string) (*Donation, error) {
-	n, err := NewDonation(donorId, amount, date, comment)
+	n, err := NewDonation(donorId, amount, date, comment, time.Now())
 	if err != nil {
 		return nil, err
 	}

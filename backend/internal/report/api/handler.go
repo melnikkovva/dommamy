@@ -2,8 +2,6 @@ package api
 
 import (
 	"encoding/csv"
-	"errors"
-	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -13,11 +11,18 @@ import (
 )
 
 type Handler struct {
-	s *report.Service
+	s      *report.Service
+	mapper *httpx.ErrorMapper
 }
 
 func New(s *report.Service) *Handler {
-	return &Handler{s: s}
+	return &Handler{
+		s: s,
+		mapper: httpx.NewErrorMapper(
+			httpx.WithNotFound(report.ErrorUnknown),
+			httpx.WithValidation(report.ErrorPeriod),
+		),
+	}
 }
 
 func (h *Handler) Register(mux *http.ServeMux) {
@@ -46,7 +51,7 @@ func filterFrom(r *http.Request) report.Filter {
 func (h *Handler) get(w http.ResponseWriter, r *http.Request) {
 	rep, err := h.s.Build(r.PathValue("name"), filterFrom(r))
 	if err != nil {
-		fail(w, err)
+		h.mapper.Handle(w, "get report", err)
 		return
 	}
 	totals := []totalResponse{}
@@ -59,7 +64,7 @@ func (h *Handler) get(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) download(w http.ResponseWriter, r *http.Request) {
 	rep, err := h.s.Build(r.PathValue("name"), filterFrom(r))
 	if err != nil {
-		fail(w, err)
+		h.mapper.Handle(w, "download report", err)
 		return
 	}
 	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
@@ -100,16 +105,4 @@ func looksLikePhone(s string) bool {
 		}
 	}
 	return true
-}
-
-func fail(w http.ResponseWriter, err error) {
-	switch {
-	case errors.Is(err, report.ErrorUnknown):
-		httpx.WriteJSON(w, http.StatusNotFound, map[string]string{"error": err.Error()})
-	case errors.Is(err, report.ErrorPeriod):
-		httpx.WriteJSON(w, http.StatusUnprocessableEntity, map[string]string{"error": err.Error()})
-	default:
-		log.Println("error report:", err)
-		httpx.WriteJSON(w, http.StatusInternalServerError, map[string]string{"error": "something went wrong"})
-	}
 }

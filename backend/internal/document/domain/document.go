@@ -1,8 +1,6 @@
 package domain
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	"path"
 	"strings"
 	"time"
@@ -37,20 +35,35 @@ const (
 
 const MaxFileSize = 10 << 20 // 10 MB
 
-var extensions = map[string]string{
-	"application/pdf": ".pdf",
-	"image/jpeg":      ".jpg",
-	"image/png":       ".png",
-	"application/msword": ".doc",
-	"application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
-	"application/vnd.ms-excel": ".xls",
-	"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": ".xlsx",
-	"application/vnd.ms-powerpoint": ".ppt",
-	"application/vnd.openxmlformats-officedocument.presentationml.presentation": ".pptx",
-	"application/zip": ".zip",
-	"application/x-zip-compressed": ".zip",
-	"text/plain": ".txt",
-	"text/csv":   ".csv",
+var allowedExtensions = map[string]string{
+	".pdf":  "application/pdf",
+	".jpg":  "image/jpeg",
+	".jpeg": "image/jpeg",
+	".png":  "image/png",
+	".doc":  "application/msword",
+	".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+	".xls":  "application/vnd.ms-excel",
+	".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+	".ppt":  "application/vnd.ms-powerpoint",
+	".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+	".zip":  "application/zip",
+	".txt":  "text/plain",
+	".csv":  "text/csv",
+}
+
+var deniedContentTypes = []string{
+	"text/html",
+	"application/x-executable",
+	"application/x-msdownload",
+	"application/octet-stream",
+}
+
+func AllowedExtensions() map[string]string {
+	return allowedExtensions
+}
+
+func DeniedContentTypes() []string {
+	return deniedContentTypes
 }
 
 type Document struct {
@@ -67,7 +80,7 @@ type Document struct {
 	createdAt    time.Time
 }
 
-func NewDocument(motherID int, docType Type, helpID int) (Document, error) {
+func NewDocument(motherID int, docType Type, helpID int, now time.Time) (Document, error) {
 	if motherID <= 0 {
 		return Document{}, ErrMother
 	}
@@ -85,13 +98,10 @@ func NewDocument(motherID int, docType Type, helpID int) (Document, error) {
 		docType:   docType,
 		helpID:    helpID,
 		status:    StatusNotSigned,
-		createdAt: time.Now(),
+		createdAt: now,
 	}, nil
 }
 
-func (d *Document) SetID(id int) {
-	d.id = id
-}
 
 func (d Document) ID() int           { return d.id }
 func (d Document) MotherID() int     { return d.motherID }
@@ -119,17 +129,19 @@ func (d *Document) AttachFile(storedName, originalName, contentType string, size
 	if size > MaxFileSize {
 		return ErrTooBig
 	}
-	if _, ok := extensions[contentType]; !ok {
+	ext := strings.ToLower(path.Ext(cleanName(originalName)))
+	if mimeType, ok := allowedExtensions[ext]; ok {
+		d.contentType = mimeType
+	} else {
 		return ErrFileType
 	}
 	d.fileName = storedName
 	d.originalName = cleanName(originalName)
-	d.contentType = contentType
 	d.size = size
 	return nil
 }
 
-func (d *Document) Sign(date string) error {
+func (d *Document) Sign(date, today string) error {
 	if d.status == StatusSigned {
 		return ErrSigned
 	}
@@ -137,7 +149,6 @@ func (d *Document) Sign(date string) error {
 		return ErrNoFile
 	}
 	date = strings.TrimSpace(date)
-	today := time.Now().Format("2006-01-02")
 	if date == "" {
 		date = today
 	}
@@ -149,16 +160,13 @@ func (d *Document) Sign(date string) error {
 	return nil
 }
 
-func NewStoredName(contentType string) (string, error) {
-	b := make([]byte, 16)
-	if _, err := rand.Read(b); err != nil {
-		return "", err
+func GetExtensionByMimeType(mimeType string) string {
+	for ext, mt := range allowedExtensions {
+		if mt == mimeType {
+			return ext
+		}
 	}
-	ext := extensions[contentType]
-	if ext == "" {
-		ext = ".bin"
-	}
-	return hex.EncodeToString(b) + ext, nil
+	return ".bin"
 }
 
 func cleanName(name string) string {

@@ -1,12 +1,14 @@
 package user
 
 import (
-	"crypto/rand"
-	"encoding/hex"
+	"errors"
 	"time"
 
+	"backend/internal/auth"
 	"golang.org/x/crypto/bcrypt"
 )
+
+const fakeHash = "$2a$10$njfjPpPf/ElcAXhzlE1Use8QDUG7m6urKLk9aCM1pX1Mxm3UJsZwG"
 
 type Repository interface {
 	Save(u *User) error
@@ -30,18 +32,13 @@ func NewService(repo Repository, secret string, tokenTTL time.Duration) *Service
 }
 
 func (s *Service) Create(login, password, firstName, lastName, role string, motherId int) (*User, error) {
-	if _, err := s.repo.UserByLogin(login); err == nil {
-		return nil, ErrorLoginTaken
-	}
-
-	hashed, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	if err != nil {
-		return nil, err
+	if len(password) < 6 {
+		return nil, ErrorPassword
 	}
 
 	u := &User{
 		Login:     login,
-		Password:  string(hashed),
+		Password:  password,
 		FirstName: firstName,
 		LastName:  lastName,
 		Role:      role,
@@ -51,6 +48,13 @@ func (s *Service) Create(login, password, firstName, lastName, role string, moth
 	if err := u.Validate(); err != nil {
 		return nil, err
 	}
+
+	hashed, err := bcrypt.GenerateFromPassword([]byte(u.Password), bcrypt.DefaultCost)
+	if err != nil {
+		return nil, err
+	}
+	u.Password = string(hashed)
+
 	if err := s.repo.Save(u); err != nil {
 		return nil, err
 	}
@@ -60,7 +64,11 @@ func (s *Service) Create(login, password, firstName, lastName, role string, moth
 func (s *Service) Login(login, password string) (string, *User, error) {
 	u, err := s.repo.UserByLogin(login)
 	if err != nil {
-		return "", nil, ErrorInvalidCredentials
+		if errors.Is(err, ErrorNotFound) {
+			_ = bcrypt.CompareHashAndPassword([]byte(fakeHash), []byte(password))
+			return "", nil, ErrorInvalidCredentials
+		}
+		return "", nil, err
 	}
 	if err := bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(password)); err != nil {
 		return "", nil, ErrorInvalidCredentials
@@ -81,13 +89,5 @@ func (s *Service) ListUsers() ([]*User, error) {
 }
 
 func (s *Service) generateToken(u *User) (string, error) {
-	randomBytes := make([]byte, 16)
-	if _, err := rand.Read(randomBytes); err != nil {
-		return "", err
-	}
-	expire := time.Now().Add(s.tokenTTL).Unix()
-	randomHex := hex.EncodeToString(randomBytes)
-
-	payload := string(u.Id) + "-" + string(rune(expire%100000)) + "-" + randomHex
-	return payload, nil
+	return auth.Generate(s.secret, u.Id, u.Role, u.MotherId, s.tokenTTL)
 }

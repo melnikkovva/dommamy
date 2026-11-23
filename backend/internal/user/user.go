@@ -29,7 +29,7 @@ func (u *User) Validate() error {
 	if u.Login == "" {
 		return ErrorLogin
 	}
-	if u.Password == "" {
+	if len(u.Password) < 6 {
 		return ErrorPassword
 	}
 	if u.FirstName == "" {

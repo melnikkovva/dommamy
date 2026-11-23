@@ -7,16 +7,20 @@ import (
 	"backend/internal/learn/domain"
 )
 
-type SyncHandler struct {
+type SyncAll interface {
+	SyncAll(ctx context.Context) error
+}
+
+type syncHandler struct {
 	repo domain.WriteRepository
 	api  domain.APIClient
 }
 
-func NewSyncHandler(repo domain.WriteRepository, api domain.APIClient) *SyncHandler {
-	return &SyncHandler{repo: repo, api: api}
+func NewSyncHandler(repo domain.WriteRepository, api domain.APIClient) SyncAll {
+	return &syncHandler{repo: repo, api: api}
 }
 
-func (h *SyncHandler) SyncAll(ctx context.Context) error {
+func (h *syncHandler) SyncAll(ctx context.Context) error {
 	log.Println("Начало синхронизации с iSpring...")
 
 	learners, err := h.api.FetchAllLearnAccounts(ctx)

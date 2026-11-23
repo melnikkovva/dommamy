@@ -24,7 +24,7 @@ type Item struct {
 	CreatedAt time.Time
 } 
 
-func AddItem(motherId int, kind Kind, sum int, checkUrl string) (*Item, error) {	
+func AddItem(motherId int, kind Kind, sum int, checkUrl string, now time.Time) (*Item, error) {	
 	if sum < 0 {
 		return nil, ErrorSum
 	}
@@ -43,6 +43,6 @@ func AddItem(motherId int, kind Kind, sum int, checkUrl string) (*Item, error) {
 		Kind: kind,
 		Sum: sum,
 		CheckUrl: checkUrl,
-		CreatedAt: time.Now(),
+		CreatedAt: now,
 	}, nil
 }

@@ -22,7 +22,7 @@ const columns = `id, mother_id, doc_type, help_id, status,
 	COALESCE(DATE_FORMAT(signed_at, '%Y-%m-%d'), ''),
 	file_name, original_name, content_type, file_size, created_at`
 
-func (r *repository) Save(ctx context.Context, d domain.Document) error {
+func (r *repository) Add(ctx context.Context, d domain.Document) (int, error) {
 	s := d.Snapshot()
 	res, err := r.db.ExecContext(
 		ctx,
@@ -33,16 +33,15 @@ func (r *repository) Save(ctx context.Context, d domain.Document) error {
 	if err != nil {
 		var me *mysqldriver.MySQLError
 		if errors.As(err, &me) && me.Number == 1062 {
-			return domain.ErrDuplicate
+			return 0, domain.ErrDuplicate
 		}
-		return err
+		return 0, err
 	}
 	id, err := res.LastInsertId()
 	if err != nil {
-		return err
+		return 0, err
 	}
-	d.SetID(int(id))
-	return nil
+	return int(id), nil
 }
 
 func (r *repository) ByID(ctx context.Context, id int) (domain.Document, error) {

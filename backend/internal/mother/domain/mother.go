@@ -11,14 +11,14 @@ type Mother struct {
 	lastName  string
 	phone     string
 	email     string
-	learnUserID string
 	photoURL  string
 	createdAt time.Time
 }
 
-func NewMother(firstName, lastName, phone, email string) (Mother, error) {
+func NewMother(firstName, lastName, phone, email string, now time.Time) (Mother, error) {
 	firstName = strings.TrimSpace(firstName)
 	lastName = strings.TrimSpace(lastName)
+	email = strings.TrimSpace(strings.ToLower(email))
 	if firstName == "" || lastName == "" {
 		return Mother{}, ErrName
 	}
@@ -27,19 +27,11 @@ func NewMother(firstName, lastName, phone, email string) (Mother, error) {
 		lastName:  lastName,
 		phone:     phone,
 		email:     email,
-		createdAt: time.Now(),
+		createdAt: now,
 	}, nil
 }
 
-func (m *Mother) SetID(id int) {
-	m.id = id
-}
-
-func (m *Mother) SetLearnUserID(learnUserID string) {
-	m.learnUserID = learnUserID
-}
-
-func (m *Mother) SetPhotoURL(photoURL string) {
+func (m *Mother) SetPhoto(photoURL string) {
 	m.photoURL = photoURL
 }
 
@@ -48,7 +40,6 @@ func (m Mother) FirstName() string    { return m.firstName }
 func (m Mother) LastName() string     { return m.lastName }
 func (m Mother) Phone() string        { return m.phone }
 func (m Mother) Email() string        { return m.email }
-func (m Mother) LearnUserID() string  { return m.learnUserID }
 func (m Mother) PhotoURL() string     { return m.photoURL }
 func (m Mother) CreatedAt() time.Time { return m.createdAt }
 
@@ -65,26 +56,23 @@ type MotherSnapshot struct {
 
 func (m Mother) Snapshot() MotherSnapshot {
 	return MotherSnapshot{
-		ID:          m.id,
-		FirstName:   m.firstName,
-		LastName:    m.lastName,
-		Phone:       m.phone,
-		Email:       m.email,
-		LearnUserID: m.learnUserID,
-		PhotoURL:    m.photoURL,
-		CreatedAt:   m.createdAt,
+		ID:        m.id,
+		FirstName: m.firstName,
+		LastName:  m.lastName,
+		Phone:     m.phone,
+		Email:     m.email,
+		PhotoURL:  m.photoURL,
+		CreatedAt: m.createdAt,
 	}
 }
 
-func restoreMother(s MotherSnapshot) Mother {
+func (s MotherSnapshot) Restore() Mother {
 	return Mother{
-		id:          s.ID,
-		firstName:   s.FirstName,
-		lastName:    s.LastName,
-		phone:       s.Phone,
-		email:       s.Email,
-		learnUserID: s.LearnUserID,
-		photoURL:    s.PhotoURL,
-		createdAt:   s.CreatedAt,
+		id:        s.ID,
+		firstName: s.FirstName,
+		lastName:  s.LastName,
+		phone:     s.Phone,
+		email:     s.Email,
+		photoURL:  s.PhotoURL,
 	}
 }

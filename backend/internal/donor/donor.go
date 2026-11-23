@@ -52,11 +52,11 @@ func (d *Donor) Validate() error {
 	return nil
 }
 
-func NewDonation(donorId, amount int, date, comment string) (*Donation, error) {
+func NewDonation(donorId, amount int, date, comment string, now time.Time) (*Donation, error) {
 	if amount <= 0 {
 		return nil, ErrorAmount
 	}
-	today := time.Now().Format("2006-01-02")
+	today := now.Format("2006-01-02")
 	date = strings.TrimSpace(date)
 	if date == "" {
 		date = today
@@ -69,6 +69,6 @@ func NewDonation(donorId, amount int, date, comment string) (*Donation, error) {
 		Amount: amount,
 		Date: date,
 		Comment: strings.TrimSpace(comment),
-		CreatedAt: time.Now(),
+		CreatedAt: now,
 	}, nil
 }

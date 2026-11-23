@@ -1,23 +1,29 @@
 package api
 
 import (
-	"encoding/json"
-	"errors"
-	"log"
 	"net/http"
-	"strconv"
-	"time"
 
 	"backend/internal/donor"
 	"backend/internal/shared/httpx"
 )
 
 type Handler struct {
-	s *donor.Service
+	s      *donor.Service
+	mapper *httpx.ErrorMapper
 }
 
 func New(s *donor.Service) *Handler {
-	return &Handler{s: s}
+	return &Handler{
+		s: s,
+		mapper: httpx.NewErrorMapper(
+			httpx.WithNotFound(donor.ErrorNotFound),
+			httpx.WithValidation(
+				donor.ErrorName, donor.ErrorKind,
+				donor.ErrorEmail, donor.ErrorAmount,
+				donor.ErrorDate,
+			),
+		),
+	}
 }
 
 func (h *Handler) Register(mux *http.ServeMux) {
@@ -68,7 +74,7 @@ type donorGetResponse struct {
 func toDonor(d *donor.Donor) donorResponse {
 	return donorResponse{
 		Id: d.Id, Name: d.Name, Kind: d.Kind, Phone: d.Phone, Email: d.Email,
-		Comment: d.Comment, CreatedAt: d.CreatedAt.Format(time.RFC3339),
+		Comment: d.Comment, CreatedAt: d.CreatedAt.Format(httpx.APITime),
 	}
 }
 
@@ -77,14 +83,18 @@ func toDonation(n *donor.Donation) donationResponse {
 }
 
 func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
-	var req donorBody
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpx.WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect JSON"})
+	req, err := httpx.ReadJSON[donorBody](w, r)
+	if err != nil {
+		if httpx.IsMaxBytesExceeded(err) {
+			httpx.WriteError(w, http.StatusRequestEntityTooLarge, "request body too large")
+			return
+		}
+		httpx.WriteError(w, http.StatusBadRequest, "incorrect JSON")
 		return
 	}
 	d, err := h.s.Create(req.Name, req.Kind, req.Phone, req.Email, req.Comment)
 	if err != nil {
-		fail(w, "create donor", err)
+		h.mapper.Handle(w, "create donor", err)
 		return
 	}
 	httpx.WriteJSON(w, http.StatusCreated, toDonor(d))
@@ -93,7 +103,7 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 	items, err := h.s.List(r.URL.Query().Get("q"))
 	if err != nil {
-		fail(w, "list donors", err)
+		h.mapper.Handle(w, "list donors", err)
 		return
 	}
 	result := []summaryResponse{}
@@ -104,14 +114,14 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) get(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.PathValue("id"))
+	id, err := httpx.PathID(r, "id")
 	if err != nil {
-		httpx.WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect id"})
+		httpx.WriteError(w, http.StatusBadRequest, "incorrect id")
 		return
 	}
 	d, donations, err := h.s.Get(id)
 	if err != nil {
-		fail(w, "get donor", err)
+		h.mapper.Handle(w, "get donor", err)
 		return
 	}
 	list := []donationResponse{}
@@ -122,57 +132,51 @@ func (h *Handler) get(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) update(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.PathValue("id"))
+	id, err := httpx.PathID(r, "id")
 	if err != nil {
-		httpx.WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect id"})
+		httpx.WriteError(w, http.StatusBadRequest, "incorrect id")
 		return
 	}
-	var req donorBody
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpx.WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect JSON"})
+	req, err := httpx.ReadJSON[donorBody](w, r)
+	if err != nil {
+		if httpx.IsMaxBytesExceeded(err) {
+			httpx.WriteError(w, http.StatusRequestEntityTooLarge, "request body too large")
+			return
+		}
+		httpx.WriteError(w, http.StatusBadRequest, "incorrect JSON")
 		return
 	}
 	d, err := h.s.Update(id, req.Name, req.Kind, req.Phone, req.Email, req.Comment)
 	if err != nil {
-		fail(w, "update donor", err)
+		h.mapper.Handle(w, "update donor", err)
 		return
 	}
 	httpx.WriteJSON(w, http.StatusOK, toDonor(d))
 }
 
 func (h *Handler) addDonation(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.PathValue("id"))
+	id, err := httpx.PathID(r, "id")
 	if err != nil {
-		httpx.WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect id"})
+		httpx.WriteError(w, http.StatusBadRequest, "incorrect id")
 		return
 	}
-	var req struct {
-		Amount int `json:"amount"`
-		Date string `json:"date"`
+	req, err := httpx.ReadJSON[struct {
+		Amount  int    `json:"amount"`
+		Date    string `json:"date"`
 		Comment string `json:"comment"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpx.WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect JSON"})
+	}](w, r)
+	if err != nil {
+		if httpx.IsMaxBytesExceeded(err) {
+			httpx.WriteError(w, http.StatusRequestEntityTooLarge, "request body too large")
+			return
+		}
+		httpx.WriteError(w, http.StatusBadRequest, "incorrect JSON")
 		return
 	}
 	n, err := h.s.AddDonation(id, req.Amount, req.Date, req.Comment)
 	if err != nil {
-		fail(w, "add donation", err)
+		h.mapper.Handle(w, "add donation", err)
 		return
 	}
 	httpx.WriteJSON(w, http.StatusCreated, toDonation(n))
-}
-
-func fail(w http.ResponseWriter, where string, err error) {
-	switch {
-	case errors.Is(err, donor.ErrorNotFound):
-		httpx.WriteJSON(w, http.StatusNotFound, map[string]string{"error": err.Error()})
-	case errors.Is(err, donor.ErrorName), errors.Is(err, donor.ErrorKind),
-		errors.Is(err, donor.ErrorEmail), errors.Is(err, donor.ErrorAmount),
-		errors.Is(err, donor.ErrorDate):
-		httpx.WriteJSON(w, http.StatusUnprocessableEntity, map[string]string{"error": err.Error()})
-	default:
-		log.Println("error", where+":", err)
-		httpx.WriteJSON(w, http.StatusInternalServerError, map[string]string{"error": "something went wrong"})
-	}
 }

@@ -1,13 +1,11 @@
 package api
 
 import (
-	"encoding/json"
 	"errors"
-	"log"
 	"net/http"
-	"strconv"
 	"time"
 
+	"backend/internal/auth"
 	"backend/internal/child"
 	"backend/internal/shared/httpx"
 )
@@ -37,55 +35,64 @@ type childResponse struct {
 	BirthDate string `json:"birth_date"`
 }
 
-func handleToResponse (c *child.Child) childResponse {
+func handleToResponse(c *child.Child) childResponse {
 	return childResponse{
 		Id: c.Id, MotherId: c.MotherId, FirstName: c.FirstName,
-		BirthDate: c.BirthDate.Format("2006-01-02"),
+		BirthDate: c.BirthDate.Format(httpx.APITime),
 	}
 }
 
 func (h *Handler) add(w http.ResponseWriter, r *http.Request) {
-	motherId, err := strconv.Atoi(r.PathValue("id"))
+	motherId, err := httpx.PathID(r, "id")
 	if err != nil {
-		httpx.WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect id mum"})
+		httpx.WriteError(w, http.StatusBadRequest, "incorrect id")
+		return
+	}
+	if !auth.RequireOwnershipOrAdmin(w, r, motherId) {
 		return
 	}
 
-	var req childRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpx.WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect JSON"})
-		return
-	}
-	birth, err := time.Parse("2006-01-02", req.BirthDate)
+	req, err := httpx.ReadJSON[childRequest](w, r)
 	if err != nil {
-		httpx.WriteJSON(w, http.StatusUnprocessableEntity, map[string]string{"error": "specify the date of birth"})
-		return
-	}
-
-	c, err := h.s.Add(motherId, req.FirstName, birth)
-	if err != nil {
-		if errors.Is(err, child.ErrorName) || errors.Is(err, child.ErrorBirth) ||
-			errors.Is(err, child.ErrorMother) || errors.Is(err, child.ErrorNoMother) {
-			httpx.WriteJSON(w, http.StatusUnprocessableEntity, map[string]string{"error": err.Error()})
+		if httpx.IsMaxBytesExceeded(err) {
+			httpx.WriteError(w, http.StatusRequestEntityTooLarge, "request body too large")
 			return
 		}
-		log.Println("error of adding child:", err)
-		httpx.WriteJSON(w, http.StatusInternalServerError, map[string]string{"error": "something went wrong"})
+		httpx.WriteError(w, http.StatusBadRequest, "incorrect JSON")
+		return
+	}
+	birth, err := time.Parse(httpx.APITime, req.BirthDate)
+	if err != nil {
+		httpx.WriteError(w, http.StatusUnprocessableEntity, "specify the date of birth")
+		return
+	}
+
+	c, err := h.s.Add(r.Context(), motherId, req.FirstName, birth)
+	if err != nil {
+		switch {
+		case errors.Is(err, child.ErrorName), errors.Is(err, child.ErrorBirth),
+			errors.Is(err, child.ErrorMother), errors.Is(err, child.ErrorNoMother):
+			httpx.WriteError(w, http.StatusUnprocessableEntity, err.Error())
+		default:
+			httpx.WriteError(w, http.StatusInternalServerError, "something went wrong")
+		}
 		return
 	}
 	httpx.WriteJSON(w, http.StatusCreated, handleToResponse(c))
 }
 
 func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
-	motherId, err := strconv.Atoi(r.PathValue("id"))
+	motherId, err := httpx.PathID(r, "id")
 	if err != nil {
-		httpx.WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect mum id"})
+		httpx.WriteError(w, http.StatusBadRequest, "incorrect id")
+		return
+	}
+	if !auth.RequireOwnershipOrAdmin(w, r, motherId) {
 		return
 	}
 	items, err := h.s.SearchByMother(motherId)
 	if err != nil {
-		log.Println("error list of child:", err)
-		httpx.WriteJSON(w, http.StatusInternalServerError, map[string]string{"error": "something went wrong"})
+		httpx.WriteError(w, http.StatusInternalServerError, "something went wrong")
 		return
 	}
 	result := []childResponse{}

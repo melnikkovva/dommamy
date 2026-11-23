@@ -25,7 +25,8 @@ type markHandler struct {
 }
 
 func (h *markHandler) Handle(ctx context.Context, cmd Mark) error {
-	if !domain.ParticipationStatus(cmd.Status).Valid() {
+	to := domain.ParticipationStatus(cmd.Status)
+	if !to.Valid() {
 		return domain.ErrInvalidStatus
 	}
 
@@ -35,11 +36,15 @@ func (h *markHandler) Handle(ctx context.Context, cmd Mark) error {
 			return err
 		}
 
-		_, err = repo.GetParticipation(ctx, cmd.EventID, cmd.MotherID)
+		current, err := repo.GetParticipation(ctx, cmd.EventID, cmd.MotherID)
 		if err != nil {
 			return err
 		}
 
-		return repo.SetParticipationStatus(ctx, cmd.EventID, cmd.MotherID, domain.ParticipationStatus(cmd.Status))
+		if !domain.CanParticipationTransition(current, to) {
+			return domain.ErrInvalidTransition
+		}
+
+		return repo.SetParticipationStatus(ctx, cmd.EventID, cmd.MotherID, to)
 	})
 }

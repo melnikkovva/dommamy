@@ -5,6 +5,7 @@ import "context"
 type Repository interface {
 	Add(ctx context.Context, e Event) (id int, err error)
 	ByID(ctx context.Context, id int) (Event, error)
+	ByIDForUpdate(ctx context.Context, id int) (Event, error)
 	CountParticipants(ctx context.Context, eventID int) (int, error)
 	AddParticipant(ctx context.Context, eventID int, motherID int) error
 	HasParticipation(ctx context.Context, eventID int, motherID int) (bool, error)

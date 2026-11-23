@@ -1,12 +1,10 @@
 package httpapi
 
 import (
-	"errors"
-	"log"
 	"net/http"
-	"slices"
 	"time"
 
+	"backend/internal/auth"
 	"backend/internal/event/application/command"
 	"backend/internal/event/application/query"
 	"backend/internal/event/domain"
@@ -19,7 +17,17 @@ func NewHandler(
 	mark command.MarkHandler,
 	reads query.ReadModel,
 ) httpx.Router {
- return &handler{createCmd: create, registerCmd: register, markCmd: mark, reads: reads}
+	return &handler{
+		createCmd: create, registerCmd: register, markCmd: mark, reads: reads,
+		mapper: httpx.NewErrorMapper(
+			httpx.WithNotFound(domain.ErrNotFound),
+			httpx.WithValidation(
+				domain.ErrTitle, domain.ErrLimit, domain.ErrMotherNotFound,
+				domain.ErrAlreadyJoined, domain.ErrFull, domain.ErrNotRegistered,
+				domain.ErrInvalidStatus, domain.ErrInvalidTransition,
+			),
+		),
+	}
 }
 
 type handler struct {
@@ -27,6 +35,7 @@ type handler struct {
 	registerCmd command.RegisterHandler
 	markCmd     command.MarkHandler
 	reads       query.ReadModel
+	mapper      *httpx.ErrorMapper
 }
 
 func (h *handler) Register(mux *http.ServeMux) {
@@ -51,7 +60,7 @@ type eventResponse struct {
 func toResponse(v query.EventView) eventResponse {
 	return eventResponse{
 		ID: v.ID, TypeID: v.TypeID, Title: v.Title,
-		StartsAt: v.StartsAt.Format("2006-01-02T15:04"),
+		StartsAt: v.StartsAt.Format(httpx.APITime),
 		Place: v.Place, MaxPeople: v.MaxPeople,
 	}
 }
@@ -93,7 +102,7 @@ type markBody struct {
 func (h *handler) types(w http.ResponseWriter, r *http.Request) {
 	items, err := h.reads.ListEventTypes(r.Context())
 	if err != nil {
-		fail(w, "list event types", err)
+		h.mapper.Handle(w, "list event types", err)
 		return
 	}
 	result := make([]eventTypeResponse, 0, len(items))
@@ -104,12 +113,16 @@ func (h *handler) types(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *handler) create(w http.ResponseWriter, r *http.Request) {
-	body, err := httpx.ReadJSON[createBody](r)
+	body, err := httpx.ReadJSON[createBody](w, r)
 	if err != nil {
+		if httpx.IsMaxBytesExceeded(err) {
+			httpx.WriteError(w, http.StatusRequestEntityTooLarge, "request body too large")
+			return
+		}
 		httpx.WriteError(w, http.StatusBadRequest, "incorrect JSON")
 		return
 	}
-	startsAt, err := time.Parse("2006-01-02T15:04", body.StartsAt)
+	startsAt, err := time.Parse(httpx.APITime, body.StartsAt)
 	if err != nil {
 		httpx.WriteError(w, http.StatusUnprocessableEntity, "specify the date and time")
 		return
@@ -122,7 +135,7 @@ func (h *handler) create(w http.ResponseWriter, r *http.Request) {
 		MaxPeople: body.MaxPeople,
 	})
 	if err != nil {
-		fail(w, "create event", err)
+		h.mapper.Handle(w, "create event", err)
 		return
 	}
 	h.respondWith(w, r, http.StatusCreated, id)
@@ -131,7 +144,7 @@ func (h *handler) create(w http.ResponseWriter, r *http.Request) {
 func (h *handler) list(w http.ResponseWriter, r *http.Request) {
 	items, err := h.reads.ListEvents(r.Context())
 	if err != nil {
-		fail(w, "list events", err)
+		h.mapper.Handle(w, "list events", err)
 		return
 	}
 	httpx.WriteJSON(w, http.StatusOK, toResponses(items))
@@ -143,9 +156,12 @@ func (h *handler) byMother(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusBadRequest, "incorrect id")
 		return
 	}
+	if !auth.RequireOwnershipOrAdmin(w, r, motherID) {
+		return
+	}
 	items, err := h.reads.EventsByMother(r.Context(), motherID)
 	if err != nil {
-		fail(w, "events by mother", err)
+		h.mapper.Handle(w, "events by mother", err)
 		return
 	}
 	httpx.WriteJSON(w, http.StatusOK, toResponses(items))
@@ -157,13 +173,17 @@ func (h *handler) register(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusBadRequest, "incorrect id")
 		return
 	}
-	body, err := httpx.ReadJSON[registerBody](r)
+	body, err := httpx.ReadJSON[registerBody](w, r)
 	if err != nil {
+		if httpx.IsMaxBytesExceeded(err) {
+			httpx.WriteError(w, http.StatusRequestEntityTooLarge, "request body too large")
+			return
+		}
 		httpx.WriteError(w, http.StatusBadRequest, "incorrect JSON")
 		return
 	}
 	if err := h.registerCmd.Handle(r.Context(), command.Register{EventID: eventID, MotherID: body.MotherID}); err != nil {
-		fail(w, "register participant", err)
+		h.mapper.Handle(w, "register participant", err)
 		return
 	}
 	httpx.WriteJSON(w, http.StatusCreated, map[string]string{"status": "ok"})
@@ -177,7 +197,7 @@ func (h *handler) participants(w http.ResponseWriter, r *http.Request) {
 	}
 	items, err := h.reads.Participants(r.Context(), eventID)
 	if err != nil {
-		fail(w, "list participants", err)
+		h.mapper.Handle(w, "list participants", err)
 		return
 	}
 	result := make([]participationResponse, 0, len(items))
@@ -194,13 +214,17 @@ func (h *handler) mark(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusBadRequest, "incorrect id")
 		return
 	}
-	body, err := httpx.ReadJSON[markBody](r)
+	body, err := httpx.ReadJSON[markBody](w, r)
 	if err != nil {
+		if httpx.IsMaxBytesExceeded(err) {
+			httpx.WriteError(w, http.StatusRequestEntityTooLarge, "request body too large")
+			return
+		}
 		httpx.WriteError(w, http.StatusBadRequest, "incorrect JSON")
 		return
 	}
 	if err := h.markCmd.Handle(r.Context(), command.Mark{EventID: eventID, MotherID: motherID, Status: body.Status}); err != nil {
-		fail(w, "mark participant", err)
+		h.mapper.Handle(w, "mark participant", err)
 		return
 	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
@@ -209,26 +233,8 @@ func (h *handler) mark(w http.ResponseWriter, r *http.Request) {
 func (h *handler) respondWith(w http.ResponseWriter, r *http.Request, status, id int) {
 	v, err := h.reads.GetEvent(r.Context(), id)
 	if err != nil {
-		fail(w, "get event", err)
+		h.mapper.Handle(w, "get event", err)
 		return
 	}
 	httpx.WriteJSON(w, status, toResponse(v))
-}
-
-var validationErrors = []error{
-	domain.ErrTitle, domain.ErrLimit, domain.ErrMotherNotFound,
-	domain.ErrAlreadyJoined, domain.ErrFull, domain.ErrNotRegistered,
-	domain.ErrInvalidStatus,
-}
-
-func fail(w http.ResponseWriter, where string, err error) {
-	switch {
-	case errors.Is(err, domain.ErrNotFound):
-		httpx.WriteError(w, http.StatusNotFound, err.Error())
-	case slices.ContainsFunc(validationErrors, func(e error) bool { return errors.Is(err, e) }):
-		httpx.WriteError(w, http.StatusUnprocessableEntity, err.Error())
-	default:
-		log.Println("error", where+":", err)
-		httpx.WriteError(w, http.StatusInternalServerError, "something went wrong")
-	}
 }

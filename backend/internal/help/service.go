@@ -2,6 +2,7 @@ package help
 
 import (
 	"context"
+	"time"
 )
 
 type Repository interface {
@@ -12,19 +13,19 @@ type Repository interface {
 
 type Service struct {
 	repo Repository
-	mother MotherChecker
+	mother MotherDirectory
 }
 
-type MotherChecker interface {
-	Exists(id int) (bool, error)
+type MotherDirectory interface {
+	Exists(ctx context.Context, id int) (bool, error)
 }
 
 func (s *Service) Item(c context.Context, motherId int, kind Kind, sum int, checkUrl string) (*Item, error) {
-	item, err := AddItem(motherId, kind, sum, checkUrl)
+	item, err := AddItem(motherId, kind, sum, checkUrl, time.Now())
 	if err != nil {
 		return nil, err
 	}
-	ok, err := s.mother.Exists(motherId)
+	ok, err := s.mother.Exists(c, motherId)
 	if err != nil {
 		return nil, err
 	}
@@ -41,7 +42,7 @@ func (s *Service) List(c context.Context) ([]*Item, error) {
 	return s.repo.List(c)
 }
 
-func NewService(repo Repository, mother MotherChecker) *Service {
+func NewService(repo Repository, mother MotherDirectory) *Service {
 	return &Service{repo: repo, mother: mother}
 }
 

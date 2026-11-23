@@ -2,6 +2,7 @@ package command
 
 import (
 	"context"
+	"errors"
 
 	"backend/internal/profile/domain"
 )
@@ -30,12 +31,11 @@ func (h *setStatusHandler) Handle(ctx context.Context, cmd SetStatus) error {
 	}
 
 	p, err := h.repo.ByMother(ctx, cmd.MotherID)
+	if errors.Is(err, domain.ErrNotFilled) {
+		return domain.ErrNotFilled
+	}
 	if err != nil {
 		return err
-	}
-
-	if p.MotherID() == 0 {
-		return domain.ErrNotFilled
 	}
 
 	if status == domain.StatusSent {

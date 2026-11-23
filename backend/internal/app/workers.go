@@ -9,13 +9,13 @@ import (
 )
 
 type LearnSyncWorker struct {
-	sync       *learncommand.SyncHandler
-	link       *learncommand.LinkUsersHandler
+	sync       learncommand.SyncAll
+	link       learncommand.LinkUsers
 	apiEnabled bool
 	interval   time.Duration
 }
 
-func NewLearnSyncWorker(sync *learncommand.SyncHandler, link *learncommand.LinkUsersHandler, apiEnabled bool, interval time.Duration) *LearnSyncWorker {
+func NewLearnSyncWorker(sync learncommand.SyncAll, link learncommand.LinkUsers, apiEnabled bool, interval time.Duration) *LearnSyncWorker {
 	return &LearnSyncWorker{sync: sync, link: link, apiEnabled: apiEnabled, interval: interval}
 }
 

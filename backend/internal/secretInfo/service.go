@@ -1,12 +1,17 @@
 package secretInfo
 
+import (
+	"context"
+	"time"
+)
+
 type Repository interface {
 	Save(d *Data) error
 	SearchByMother(motherId int) (*Data, error)
 }
 
-type MotherChecker interface {
-	Exists(id int) (bool, error)
+type MotherDirectory interface {
+	Exists(ctx context.Context, id int) (bool, error)
 }
 
 type Auditor interface {
@@ -15,20 +20,20 @@ type Auditor interface {
 
 type Service struct {
 	repo Repository
-	mothers MotherChecker
+	mothers MotherDirectory
 	audit Auditor
 }
 
-func NewService(repo Repository, mothers MotherChecker, audit Auditor) *Service {
+func NewService(repo Repository, mothers MotherDirectory, audit Auditor) *Service {
 	return &Service{repo: repo, mothers: mothers, audit: audit}
 }
 
-func (s *Service) Save(motherId int, criminal, ndPnd, drugs, chronic string) error {
-	d, err := AddNew(motherId, criminal, ndPnd, drugs, chronic)
+func (s *Service) Save(ctx context.Context, motherId int, criminal, ndPnd, drugs, chronic string) error {
+	d, err := AddNew(motherId, criminal, ndPnd, drugs, chronic, time.Now())
 	if err != nil {
 		return err
 	}
-	ok, err := s.mothers.Exists(motherId)
+	ok, err := s.mothers.Exists(ctx, motherId)
 	if err != nil {
 		return err
 	}

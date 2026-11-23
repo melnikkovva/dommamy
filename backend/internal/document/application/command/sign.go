@@ -2,6 +2,7 @@ package command
 
 import (
 	"context"
+	"time"
 
 	"backend/internal/document/domain"
 )
@@ -29,7 +30,8 @@ func (h *signHandler) Handle(ctx context.Context, cmd Sign) (int, error) {
 		return 0, err
 	}
 
-	if err := d.Sign(cmd.SignedAt); err != nil {
+	today := time.Now().Format("2006-01-02")
+	if err := d.Sign(cmd.SignedAt, today); err != nil {
 		return 0, err
 	}
 

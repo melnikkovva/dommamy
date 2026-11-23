@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"errors"
 
+	mysqldriver "github.com/go-sql-driver/mysql"
+
 	"backend/internal/event/domain"
 )
 
@@ -32,12 +34,15 @@ func (r *repository) Add(ctx context.Context, e domain.Event) (id int, err error
 	if err != nil {
 		return 0, err
 	}
-	e.SetID(int(lastID))
 	return int(lastID), nil
 }
 
 func (r *repository) ByID(ctx context.Context, id int) (domain.Event, error) {
 	return r.byID(ctx, id, "")
+}
+
+func (r *repository) ByIDForUpdate(ctx context.Context, id int) (domain.Event, error) {
+	return r.byID(ctx, id, " FOR UPDATE")
 }
 
 func (r *repository) byID(ctx context.Context, id int, lock string) (domain.Event, error) {
@@ -64,7 +69,14 @@ func (r *repository) AddParticipant(ctx context.Context, eventID int, motherID i
 		"INSERT INTO participation (event_id, mother_id, status) VALUES (?, ?, 'registered')",
 		eventID, motherID,
 	)
-	return err
+	if err != nil {
+		var me *mysqldriver.MySQLError
+		if errors.As(err, &me) && me.Number == 1062 {
+			return domain.ErrAlreadyJoined
+		}
+		return err
+	}
+	return nil
 }
 
 func (r *repository) HasParticipation(ctx context.Context, eventID int, motherID int) (bool, error) {

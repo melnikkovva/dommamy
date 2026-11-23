@@ -2,6 +2,7 @@ package command
 
 import (
 	"context"
+	"time"
 
 	"backend/internal/document/domain"
 )
@@ -27,7 +28,7 @@ type createHandler struct {
 }
 
 func (h *createHandler) Handle(ctx context.Context, cmd Create) (int, error) {
-	d, err := domain.NewDocument(cmd.MotherID, domain.Type(cmd.Type), cmd.HelpID)
+	d, err := domain.NewDocument(cmd.MotherID, domain.Type(cmd.Type), cmd.HelpID, time.Now())
 	if err != nil {
 		return 0, err
 	}
@@ -50,8 +51,9 @@ func (h *createHandler) Handle(ctx context.Context, cmd Create) (int, error) {
 		}
 	}
 
-	if err := h.repo.Save(ctx, d); err != nil {
+	id, err := h.repo.Add(ctx, d)
+	if err != nil {
 		return 0, err
 	}
-	return d.ID(), nil
+	return id, nil
 }

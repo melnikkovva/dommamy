@@ -8,16 +8,21 @@ import (
 	"backend/internal/learn/domain"
 )
 
-type LinkUsersHandler struct {
-	repo   domain.ReadRepository
+type LinkUsers interface {
+	LinkUsers(ctx context.Context) error
+}
+
+type linkUsersHandler struct {
+	repo    domain.ReadRepository
 	mothers domain.MotherDirectory
+	links   domain.MotherLearnLinkRepository
 }
 
-func NewLinkUsersHandler(repo domain.ReadRepository, mothers domain.MotherDirectory) *LinkUsersHandler {
-	return &LinkUsersHandler{repo: repo, mothers: mothers}
+func NewLinkUsersHandler(repo domain.ReadRepository, mothers domain.MotherDirectory, links domain.MotherLearnLinkRepository) LinkUsers {
+	return &linkUsersHandler{repo: repo, mothers: mothers, links: links}
 }
 
-func (h *LinkUsersHandler) LinkUsers(ctx context.Context) error {
+func (h *linkUsersHandler) LinkUsers(ctx context.Context) error {
 	learners, err := h.repo.GetAllLearners(ctx)
 	if err != nil {
 		return err
@@ -36,54 +41,35 @@ func (h *LinkUsersHandler) LinkUsers(ctx context.Context) error {
 		}
 	}
 
-	loginMap := make(map[string]string)
-	for _, l := range learners {
-		login := strings.TrimSpace(strings.ToLower(l.Login))
-		if login != "" {
-			loginMap[login] = l.UserId
-		}
-	}
-
 	linked := 0
 	for _, m := range mothers {
+		alreadyLinked, err := h.links.IsLinked(ctx, m.Id)
+		if err != nil {
+			log.Printf("LinkUsers: ошибка проверки связи mother %d: %v", m.Id, err)
+			continue
+		}
+		if alreadyLinked {
+			continue
+		}
+
 		motherEmail := strings.TrimSpace(strings.ToLower(m.Email))
-		if motherEmail != "" {
-			if userId, ok := emailMap[motherEmail]; ok {
-				if err := h.mothers.UpdateLearnUserID(ctx, m.Id, userId); err != nil {
-					log.Printf("LinkUsers: ошибка обновления mother %d: %v", m.Id, err)
-					continue
-				}
-				linked++
-				log.Printf("LinkUsers: mother %d (%s %s, email=%s) → learner %s (by email)", m.Id, m.FirstName, m.LastName, m.Email, userId)
-				continue
-			}
+		if motherEmail == "" {
+			continue
 		}
 
-		if motherEmail != "" {
-			if userId, ok := loginMap[motherEmail]; ok {
-				if err := h.mothers.UpdateLearnUserID(ctx, m.Id, userId); err != nil {
-					log.Printf("LinkUsers: ошибка обновления mother %d: %v", m.Id, err)
-					continue
-				}
-				linked++
-				log.Printf("LinkUsers: mother %d (%s %s, email=%s) → learner %s (by login)", m.Id, m.FirstName, m.LastName, m.Email, userId)
-				continue
-			}
+		userId, ok := emailMap[motherEmail]
+		if !ok {
+			continue
 		}
 
-		motherPhone := strings.TrimSpace(strings.ToLower(m.Phone))
-		if motherPhone != "" {
-			if userId, ok := loginMap[motherPhone]; ok {
-				if err := h.mothers.UpdateLearnUserID(ctx, m.Id, userId); err != nil {
-					log.Printf("LinkUsers: ошибка обновления mother %d: %v", m.Id, err)
-					continue
-				}
-				linked++
-				log.Printf("LinkUsers: mother %d (%s %s, phone=%s) → learner %s (by login)", m.Id, m.FirstName, m.LastName, m.Phone, userId)
-			}
+		if err := h.links.Link(ctx, m.Id, userId); err != nil {
+			log.Printf("LinkUsers: ошибка создания связи mother %d: %v", m.Id, err)
+			continue
 		}
+		linked++
+		log.Printf("LinkUsers: mother %d связана с пользователем Learn", m.Id)
 	}
 
-	log.Printf("LinkUsers: связано %d мам с пользователями Learn", linked)
+	log.Printf("LinkUsers: создано %d новых связей", linked)
 	return nil
 }

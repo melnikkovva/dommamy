@@ -1,12 +1,10 @@
 package api
 
 import (
-	"encoding/json"
 	"errors"
-	"log"
 	"net/http"
-	"strconv"
 
+	"backend/internal/auth"
 	"backend/internal/secretInfo"
 	"backend/internal/shared/httpx"
 )
@@ -32,20 +30,22 @@ type dataBody struct {
 }
 
 func (h *Handler) reveal(w http.ResponseWriter, r *http.Request) {
-	motherId, err := strconv.Atoi(r.PathValue("id"))
+	motherId, err := httpx.PathID(r, "id")
 	if err != nil {
-		httpx.WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect id mum"})
+		httpx.WriteError(w, http.StatusBadRequest, "incorrect id")
+		return
+	}
+	if !auth.RequireOwnershipOrAdmin(w, r, motherId) {
 		return
 	}
 
 	d, err := h.s.Reveal(motherId)
 	if errors.Is(err, secretInfo.ErrorNotFound) {
-		httpx.WriteJSON(w, http.StatusNotFound, map[string]string{"error": err.Error()})
+		httpx.WriteError(w, http.StatusNotFound, err.Error())
 		return
 	}
 	if err != nil {
-		log.Println("error reveal secret info:", err)
-		httpx.WriteJSON(w, http.StatusInternalServerError, map[string]string{"error": "something went wrong"})
+		httpx.WriteError(w, http.StatusInternalServerError, "something went wrong")
 		return
 	}
 	httpx.WriteJSON(w, http.StatusOK, dataBody{
@@ -57,25 +57,31 @@ func (h *Handler) reveal(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) save(w http.ResponseWriter, r *http.Request) {
-	motherId, err := strconv.Atoi(r.PathValue("id"))
+	motherId, err := httpx.PathID(r, "id")
 	if err != nil {
-		httpx.WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect id mum"})
+		httpx.WriteError(w, http.StatusBadRequest, "incorrect id")
 		return
 	}
-	var req dataBody
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpx.WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect JSON"})
+	if !auth.RequireOwnershipOrAdmin(w, r, motherId) {
+		return
+	}
+	req, err := httpx.ReadJSON[dataBody](w, r)
+	if err != nil {
+		if httpx.IsMaxBytesExceeded(err) {
+			httpx.WriteError(w, http.StatusRequestEntityTooLarge, "request body too large")
+			return
+		}
+		httpx.WriteError(w, http.StatusBadRequest, "incorrect JSON")
 		return
 	}
 
-	err = h.s.Save(motherId, req.CriminalRecord, req.NdPnd, req.Drugs, req.ChronicDiseases)
+	err = h.s.Save(r.Context(), motherId, req.CriminalRecord, req.NdPnd, req.Drugs, req.ChronicDiseases)
 	if errors.Is(err, secretInfo.ErrorNoMother) || errors.Is(err, secretInfo.ErrorMother) {
-		httpx.WriteJSON(w, http.StatusUnprocessableEntity, map[string]string{"error": err.Error()})
+		httpx.WriteError(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}
 	if err != nil {
-		log.Println("error save secret info:", err)
-		httpx.WriteJSON(w, http.StatusInternalServerError, map[string]string{"error": "something went wrong"})
+		httpx.WriteError(w, http.StatusInternalServerError, "something went wrong")
 		return
 	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})

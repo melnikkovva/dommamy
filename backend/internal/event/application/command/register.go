@@ -34,27 +34,17 @@ func (h *registerHandler) Handle(ctx context.Context, cmd Register) error {
 	}
 
 	return h.uow.Do(ctx, func(ctx context.Context, repo domain.Repository) error {
-		has, err := repo.HasParticipation(ctx, cmd.EventID, cmd.MotherID)
-		if err != nil {
-			return err
-		}
-		if has {
-			return domain.ErrAlreadyJoined
-		}
-
-		e, err := repo.ByID(ctx, cmd.EventID)
+		e, err := repo.ByIDForUpdate(ctx, cmd.EventID)
 		if err != nil {
 			return err
 		}
 
-		if e.MaxPeople() > 0 {
-			count, err := repo.CountParticipants(ctx, cmd.EventID)
-			if err != nil {
-				return err
-			}
-			if count >= e.MaxPeople() {
-				return domain.ErrFull
-			}
+		count, err := repo.CountParticipants(ctx, cmd.EventID)
+		if err != nil {
+			return err
+		}
+		if err := e.EnsureHasPlace(count); err != nil {
+			return err
 		}
 
 		return repo.AddParticipant(ctx, cmd.EventID, cmd.MotherID)

@@ -2,6 +2,7 @@ package command
 
 import (
 	"context"
+	"time"
 
 	"backend/internal/lifecycle/domain"
 )
@@ -46,7 +47,7 @@ func (h *changeHandler) Handle(ctx context.Context, cmd Change) error {
 
 	aggregate := domain.RestoreHistory(cmd.MotherID, history)
 
-	if err := aggregate.Transition(status, cmd.Reason); err != nil {
+	if err := aggregate.Transition(status, cmd.Reason, time.Now()); err != nil {
 		return err
 	}
 
@@ -56,5 +57,6 @@ func (h *changeHandler) Handle(ctx context.Context, cmd Change) error {
 	}
 	newest := changes[len(changes)-1]
 
-	return h.repo.Add(ctx, newest)
+	_, err = h.repo.Add(ctx, newest)
+	return err
 }

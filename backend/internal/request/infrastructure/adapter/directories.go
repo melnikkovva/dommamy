@@ -9,14 +9,6 @@ import (
 	"backend/internal/request/domain"
 )
 
-type MotherChecker interface {
-	Exists(ctx context.Context, id int) (bool, error)
-}
-
-func NewMotherDirectory(checker MotherChecker) command.MotherDirectory {
-	return checker
-}
-
 func NewHelpDirectory(s *help.Service) command.HelpDirectory {
 	return &helpDirectory{s: s}
 }
