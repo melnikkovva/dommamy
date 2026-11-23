@@ -52,6 +52,7 @@ type Profile struct {
 	fatherInfo     string
 	pregnancyWeeks int
 	situation      string
+	problemType    string
 	expectedHelp   string
 	source         string
 	status         Status
@@ -84,6 +85,7 @@ type ProfileInput struct {
 	FatherInfo     string
 	PregnancyWeeks int
 	Situation      string
+	ProblemType    string
 	ExpectedHelp   string
 	Source         string
 }
@@ -117,6 +119,7 @@ func (p *Profile) Fill(input ProfileInput, now time.Time) error {
 		return ErrWeeks
 	}
 	p.situation = strings.TrimSpace(input.Situation)
+	p.problemType = strings.TrimSpace(input.ProblemType)
 	p.expectedHelp = strings.TrimSpace(input.ExpectedHelp)
 	p.source = strings.TrimSpace(input.Source)
 	p.updatedAt = now
@@ -162,6 +165,7 @@ func (p Profile) MaritalStatus() string    { return p.maritalStatus }
 func (p Profile) FatherInfo() string       { return p.fatherInfo }
 func (p Profile) PregnancyWeeks() int      { return p.pregnancyWeeks }
 func (p Profile) Situation() string        { return p.situation }
+func (p Profile) ProblemType() string      { return p.problemType }
 func (p Profile) ExpectedHelp() string     { return p.expectedHelp }
 func (p Profile) Source() string           { return p.source }
 func (p Profile) Status() Status           { return p.status }
@@ -184,6 +188,7 @@ type Snapshot struct {
 	FatherInfo     string
 	PregnancyWeeks int
 	Situation      string
+	ProblemType    string
 	ExpectedHelp   string
 	Source         string
 	Status         Status
@@ -208,6 +213,7 @@ func Restore(s Snapshot) Profile {
 		fatherInfo:     s.FatherInfo,
 		pregnancyWeeks: s.PregnancyWeeks,
 		situation:      s.Situation,
+		problemType:    s.ProblemType,
 		expectedHelp:   s.ExpectedHelp,
 		source:         s.Source,
 		status:         s.Status,
@@ -233,6 +239,7 @@ func (p Profile) Snapshot() Snapshot {
 		FatherInfo:     p.fatherInfo,
 		PregnancyWeeks: p.pregnancyWeeks,
 		Situation:      p.situation,
+		ProblemType:    p.problemType,
 		ExpectedHelp:   p.expectedHelp,
 		Source:         p.source,
 		Status:         p.status,

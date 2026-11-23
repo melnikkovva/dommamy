@@ -4,7 +4,8 @@ import (
 	"time"
 )
 
-var kindNames = map[string]string{"food": "Продукты", "clothes": "Вещи", "furniture": "Мебель", "other": "Другое"}
+var kindNames = map[string]string{"food": "Продукты", "clothes": "Вещи", "furniture": "Мебель", "stationery": "Канцелярия", "gifts": "Подарки", "consultation": "Консультация", "other": "Другое"}
+var problemTypeNames = map[string]string{"": "Не указана", "housing": "Жилищная", "unemployment": "Безработица", "single_parent": "Одинокая мама", "low_income": "Низкий доход", "violence": "Насилие", "other": "Другое"}
 var eventStatusNames = map[string]string{"registered": "Записана", "came": "Пришла", "absent": "Не пришла"}
 var motherStatusNames = map[string]string{"review": "На рассмотрении", "active": "На сопровождении", "inactive": "Неактивна"}
 var profileStatusNames = map[string]string{"": "Нет анкеты", "draft": "Черновик", "sent": "Отправлена", "checked": "Проверена"}
@@ -12,6 +13,7 @@ var profileStatusNames = map[string]string{"": "Нет анкеты", "draft": "
 type Filter struct {
 	From string
 	To string
+	ProblemType string
 }
 
 func (f Filter) Validate() error {
@@ -76,16 +78,29 @@ type MotherRow struct {
 	Registered string
 	Children int
 	Situation string
+	ProblemType string
 	IncomeSource string
 	Income int
 	ProfileStatus string
 	Status string
 	HelpCount int
+	RequestCount int
+	ConsultationCount int
+	PsychologistCount int
+	LawyerCount int
+	PriestCount int
+	EmploymentCount int
+	EventCount int
 }
 
 type Total struct {
 	Label string
 	Value string
+}
+
+type ProblemTypeTotal struct {
+	ProblemType string
+	Count       int
 }
 
 type Report struct {

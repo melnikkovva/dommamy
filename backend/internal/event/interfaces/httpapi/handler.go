@@ -51,6 +51,7 @@ func (h *handler) Register(mux *http.ServeMux) {
 type eventResponse struct {
 	ID        int    `json:"id"`
 	TypeID    int    `json:"type_id"`
+	TypeName  string `json:"type_name"`
 	Title     string `json:"title"`
 	StartsAt  string `json:"starts_at"`
 	Place     string `json:"place"`
@@ -59,7 +60,7 @@ type eventResponse struct {
 
 func toResponse(v query.EventView) eventResponse {
 	return eventResponse{
-		ID: v.ID, TypeID: v.TypeID, Title: v.Title,
+		ID: v.ID, TypeID: v.TypeID, TypeName: v.TypeName, Title: v.Title,
 		StartsAt: v.StartsAt.Format(httpx.APITime),
 		Place: v.Place, MaxPeople: v.MaxPeople,
 	}
@@ -122,7 +123,10 @@ func (h *handler) create(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusBadRequest, "incorrect JSON")
 		return
 	}
-	startsAt, err := time.Parse(httpx.APITime, body.StartsAt)
+	startsAt, err := time.Parse(httpx.LocalDateTime, body.StartsAt)
+	if err != nil {
+		startsAt, err = time.Parse(httpx.APITime, body.StartsAt)
+	}
 	if err != nil {
 		httpx.WriteError(w, http.StatusUnprocessableEntity, "specify the date and time")
 		return

@@ -3,7 +3,7 @@ import { getIPR } from '../../api/mothers'
 import { useLoad } from '../../hooks/useLoad'
 import LoadState from '../../components/LoadState'
 import { fmtDate } from '../../utils/format'
-import type { IprPlan } from '../../types'
+import type { IprPlan, IprTask } from '../../types'
 
 const statusLabels: Record<string, string> = {
   NOT_STARTED: 'Не начат',
@@ -12,33 +12,59 @@ const statusLabels: Record<string, string> = {
   COMPLETED: 'Завершён',
 }
 
-const taskStatusIcon = (status: string) => {
-  if (status === 'COMPLETED') return '✓'
-  if (status === 'IN_PROGRESS') return '◐'
-  return '○'
+const statusBadgeClass = (status: string) => {
+  if (status === 'COMPLETED') return 'task-badge task-badge-done'
+  if (status === 'IN_PROGRESS') return 'task-badge task-badge-progress'
+  if (status === 'WAITING_DECISION') return 'task-badge task-badge-wait'
+  return 'task-badge task-badge-todo'
 }
 
-function TaskItem({ task }: { task: { task_id: string; title: string; description: string; status: string; is_overdue: boolean; absolute_due_date?: string; completion_date?: string } }) {
-  const icon = taskStatusIcon(task.status)
+const statusBadgeLabel = (status: string) => statusLabels[status] || status
+
+function tryParseQuillDescription(raw: string): string | null {
+  try {
+    const obj = JSON.parse(raw)
+    if (obj.state && Array.isArray(obj.state)) {
+      const texts = obj.state
+        .filter((s: any) => s.T && typeof s.T === 'string')
+        .map((s: any) => s.T)
+      return texts.join(' ') || null
+    }
+  } catch {
+  }
+  return null
+}
+
+function TaskItem({ task }: { task: IprTask }) {
   const isCompleted = task.status === 'COMPLETED'
+  const descText = task.description ? tryParseQuillDescription(task.description) : null
 
   return (
     <div className={`ipr-task ${isCompleted ? 'task-completed' : ''} ${task.is_overdue ? 'task-overdue' : ''}`}>
-      <span className="task-icon">{icon}</span>
-      <div className="task-content">
-        <span className="task-title">{task.title}</span>
-        {task.description && <span className="task-description">{task.description}</span>}
+      <div className="ipr-task-left">
+        <span className={`task-check ${isCompleted ? 'check-done' : task.status === 'IN_PROGRESS' ? 'check-progress' : ''}`}>
+          {isCompleted ? '✓' : task.status === 'IN_PROGRESS' ? '◐' : '○'}
+        </span>
+        <div className="ipr-task-info">
+          <span className="task-title">{task.title || 'Без названия'}</span>
+          {descText && <span className="task-desc-text">{descText}</span>}
+        </div>
       </div>
-      <div className="task-meta">
+      <div className="ipr-task-right">
+        <span className={statusBadgeClass(task.status)}>{statusBadgeLabel(task.status)}</span>
         {task.is_overdue && <span className="badge badge-danger">Просрочено</span>}
-        {task.absolute_due_date && <span className="muted">до {fmtDate(task.absolute_due_date)}</span>}
-        {task.completion_date && <span className="muted">выполнено {fmtDate(task.completion_date)}</span>}
+        {task.absolute_due_date && (
+          <span className="task-due">до {fmtDate(task.absolute_due_date)}</span>
+        )}
+        {task.completion_date && (
+          <span className="task-done-date">✓ {fmtDate(task.completion_date)}</span>
+        )}
       </div>
     </div>
   )
 }
 
-function StageSection({ stage, planProgress }: { stage: { stage_id: string; title: string; description: string; start_date?: string; end_date?: string; tasks: { task_id: string; title: string; description: string; status: string; is_overdue: boolean; absolute_due_date?: string; completion_date?: string }[] }; planProgress: number }) {
+function StageSection({ stage }: { stage: { stage_id: string; title: string; start_date?: string; end_date?: string; tasks: IprTask[] } }) {
   const [isOpen, setIsOpen] = useState(true)
   const completedTasks = stage.tasks.filter((t) => t.status === 'COMPLETED').length
   const totalTasks = stage.tasks.length
@@ -47,18 +73,29 @@ function StageSection({ stage, planProgress }: { stage: { stage_id: string; titl
   return (
     <div className="ipr-stage">
       <button className="ipr-stage-header" onClick={() => setIsOpen(!isOpen)}>
-        <span className="stage-arrow">{isOpen ? '▼' : '▶'}</span>
-        <div className="stage-title">
-          {stage.title}
-          {stage.description && <span className="stage-description">{stage.description}</span>}
+        <span className="stage-arrow">{isOpen ? '▾' : '▸'}</span>
+        <div className="stage-info">
+          <span className="stage-title">{stage.title}</span>
+          {(stage.start_date || stage.end_date) && (
+            <span className="stage-dates">
+              {stage.start_date && fmtDate(stage.start_date)}
+              {stage.start_date && stage.end_date && ' — '}
+              {stage.end_date && fmtDate(stage.end_date)}
+            </span>
+          )}
         </div>
-        <div className="stage-progress">
-          <span className="muted">{completedTasks}/{totalTasks}</span>
-          <span className="badge {stageProgress === 100 ? 'badge-ok' : 'badge-wait'}">{stageProgress}%</span>
+        <div className="stage-progress-mini">
+          <div className="stage-progress-track">
+            <div className="stage-progress-fill" style={{ width: `${stageProgress}%` }} />
+          </div>
+          <span className="stage-progress-text">
+            {completedTasks}/{totalTasks}
+          </span>
         </div>
       </button>
       {isOpen && (
         <div className="ipr-tasks">
+          {stage.tasks.length === 0 && <p className="muted" style={{ paddingLeft: '28px' }}>Нет задач</p>}
           {stage.tasks.map((t) => (
             <TaskItem key={t.task_id} task={t} />
           ))}
@@ -76,44 +113,65 @@ function IPRCard({ plan }: { plan: IprPlan }) {
 
   return (
     <div className="card ipr-card">
-      <div className="ipr-header">
-        <h3>{plan.title}</h3>
-        <span className={`badge ${isCompleted ? 'badge-ok' : isInProgress ? 'badge-wait' : 'badge-info'}`}>
-          {statusLabel}
+      <div className="ipr-card-header">
+        <div className="ipr-card-title-row">
+          <h3 className="ipr-plan-title">{plan.title}</h3>
+          <span className={`ipr-status-badge ${isCompleted ? 'ipr-status-done' : isInProgress ? 'ipr-status-active' : ''}`}>
+            {statusLabel}
+          </span>
+        </div>
+        {plan.mentor_name && (
+          <div className="ipr-mentor">
+            <span className="ipr-mentor-icon"></span> {plan.mentor_name}
+          </div>
+        )}
+      </div>
+
+      <div className="ipr-meta-row">
+        <div className="ipr-meta-item">
+          <span>
+            {fmtDate(plan.start_date)}
+            {plan.end_date && ` — ${fmtDate(plan.end_date)}`}
+          </span>
+        </div>
+        <div className="ipr-meta-item">
+          <span>{plan.total_tasks} задач</span>
+        </div>
+      </div>
+
+      <div className="ipr-progress-section">
+        <div className="ipr-progress-header">
+          <span className="ipr-progress-label">Общий прогресс</span>
+          <span className="ipr-progress-percent">{progressPercent}%</span>
+        </div>
+        <div className="ipr-progress-track">
+          <div
+            className={`ipr-progress-fill ${isCompleted ? 'ipr-progress-done' : ''}`}
+            style={{ width: `${progressPercent}%` }}
+          />
+        </div>
+        <span className="ipr-progress-detail">
+          {plan.completed_tasks} из {plan.total_tasks} задач выполнено
         </span>
       </div>
 
-      {plan.mentor_name && (
-        <p className="muted">Наставник: {plan.mentor_name}</p>
-      )}
-
-      <div className="ipr-dates">
-        <span>Период: {fmtDate(plan.start_date)}</span>
-        {plan.end_date && <span>— {fmtDate(plan.end_date)}</span>}
-      </div>
-
-      <div className="progress-section">
-        <span className="progress-label">Прогресс</span>
-        <span className="progress-value">{progressPercent}% ({plan.completed_tasks} из {plan.total_tasks} задач)</span>
-        <div className="progress-bar">
-          <div className="progress-fill" style={{ width: `${progressPercent}%` }} />
-        </div>
-      </div>
-
       {plan.goals && plan.goals.length > 0 && (
-        <div className="ipr-goals">
-          <span className="field-label">Цели</span>
-          <ul>
+        <div className="ipr-goals-section">
+          <span className="ipr-section-label"> Цели</span>
+          <div className="ipr-goals-list">
             {plan.goals.map((goal, i) => (
-              <li key={i}>{goal}</li>
+              <span key={i} className="ipr-goal-chip">{goal}</span>
             ))}
-          </ul>
+          </div>
         </div>
       )}
 
-      {plan.stages.map((stage) => (
-        <StageSection key={stage.stage_id} stage={stage} planProgress={plan.progress} />
-      ))}
+      <div className="ipr-stages-section">
+        <span className="ipr-section-label">Этапы</span>
+        {plan.stages.map((stage) => (
+          <StageSection key={stage.stage_id} stage={stage} />
+        ))}
+      </div>
     </div>
   )
 }
@@ -127,36 +185,37 @@ export default function IprTab({ motherId }: { motherId: number }) {
   const completed = plans.filter((p) => p.status === 'COMPLETED')
 
   return (
-    <div>
+    <div className="ipr-page">
       {active.length > 0 && (
-        <div>
-          <h2>Активные планы</h2>
-          <div className="ipr-grid">
+        <section className="ipr-section">
+          <h2 className="ipr-section-title">
+            <span className="section-icon"></span> Активные планы
+          </h2>
+          <div className="ipr-card-list">
             {active.map((p) => (
               <IPRCard key={p.plan_id} plan={p} />
             ))}
           </div>
-        </div>
+        </section>
       )}
 
       {completed.length > 0 && (
-        <div>
-          <h2>Завершённые планы</h2>
-          <div className="ipr-grid">
+        <section className="ipr-section">
+          <h2 className="ipr-section-title">
+            <span className="section-icon"></span> Завершённые планы
+          </h2>
+          <div className="ipr-card-list">
             {completed.map((p) => (
               <IPRCard key={p.plan_id} plan={p} />
             ))}
           </div>
-        </div>
+        </section>
       )}
 
       {plans.length === 0 && (
-        <div className="card">
-          <h2>Индивидуальные планы развития</h2>
-          <div className="empty-courses">
-            <span className="empty-icon">📋</span>
-            <span className="muted">ИПР пока не назначены</span>
-          </div>
+        <div className="card ipr-empty">
+          <h3>Индивидуальные планы развития</h3>
+          <p className="muted">ИПР пока не назначены</p>
         </div>
       )}
     </div>

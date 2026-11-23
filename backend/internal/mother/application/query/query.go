@@ -65,15 +65,24 @@ type IPRTaskDTO struct {
 }
 
 type MotherView struct {
-	ID          int             `json:"id"`
-	FirstName   string          `json:"first_name"`
-	LastName    string          `json:"last_name"`
-	Phone       string          `json:"phone"`
-	Email       string          `json:"email"`
-	LearnUserID string          `json:"learn_user_id"`
-	PhotoURL    string          `json:"photo_url,omitempty"`
-	CreatedAt   time.Time       `json:"created_at"`
-	CourseStats *CourseStatsDTO `json:"course_stats,omitempty"`
+	ID            int             `json:"id"`
+	FirstName     string          `json:"first_name"`
+	LastName      string          `json:"last_name"`
+	Phone         string          `json:"phone"`
+	Email         string          `json:"email"`
+	LearnUserID   string          `json:"learn_user_id"`
+	PhotoURL      string          `json:"photo_url,omitempty"`
+	CreatedAt     time.Time       `json:"created_at"`
+	ProfileStatus string          `json:"profile_status"`
+	MotherStatus  string          `json:"mother_status"`
+	CourseStats   *CourseStatsDTO `json:"course_stats,omitempty"`
+}
+
+type MotherFilter struct {
+	Q             string
+	Phone         string
+	ProfileStatus string
+	MotherStatus  string
 }
 
 type LearnStats interface {
@@ -84,7 +93,7 @@ type LearnStats interface {
 
 type ReadModel interface {
 	GetByID(ctx context.Context, id int) (MotherView, error)
-	Search(ctx context.Context, q string) ([]MotherView, error)
+	Search(ctx context.Context, f MotherFilter) ([]MotherView, error)
 	Exists(ctx context.Context, id int) (bool, error)
 }
 

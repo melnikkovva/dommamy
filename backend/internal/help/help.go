@@ -9,6 +9,10 @@ type Kind string
 const (
 	Food Kind = "food"
 	Clothes Kind = "clothes"
+	Furniture Kind = "furniture"
+	Stationery Kind = "stationery"
+	Gifts Kind = "gifts"
+	Consultation Kind = "consultation"
 )
 
 func (h Kind) RequireCheck() bool {

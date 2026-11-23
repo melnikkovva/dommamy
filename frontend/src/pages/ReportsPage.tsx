@@ -10,16 +10,27 @@ const reports: [string, string][] = [
   ['mothers', 'Подопечные']
 ]
 
+const problemTypes: [string, string][] = [
+  ['', 'Все типы'],
+  ['housing', 'Жилищная'],
+  ['unemployment', 'Безработица'],
+  ['single_parent', 'Одинокая мама'],
+  ['low_income', 'Низкий доход'],
+  ['violence', 'Насилие'],
+  ['other', 'Другое']
+]
+
 export default function ReportsPage() {
   const [name, setName] = useState('aid')
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
-  const { data, error } = useLoad(() => getReport(name, from, to), [name, from, to])
+  const [problemType, setProblemType] = useState('')
+  const { data, error } = useLoad(() => getReport(name, from, to, problemType), [name, from, to, problemType])
   return (
     <div>
       <div className="page-head">
         <h1>Отчёты</h1>
-        <a className="btn btn-primary" href={reportCsvUrl(name, from, to)}>Скачать в Excel</a>
+        <a className="btn btn-primary" href={reportCsvUrl(name, from, to, problemType)}>Скачать в Excel</a>
       </div>
       <div className="report-tabs">
         {reports.map(([key, text]) => (
@@ -29,7 +40,16 @@ export default function ReportsPage() {
       <div className="period">
         <Field label="С даты"><input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></Field>
         <Field label="По дату"><input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></Field>
-        <button className="btn" onClick={() => { setFrom(''); setTo('') }}>Весь период</button>
+        {name === 'mothers' && (
+          <Field label="Тип проблемы">
+            <select value={problemType} onChange={(e) => setProblemType(e.target.value)}>
+              {problemTypes.map(([key, text]) => (
+                <option key={key} value={key}>{text}</option>
+              ))}
+            </select>
+          </Field>
+        )}
+        <button className="btn" onClick={() => { setFrom(''); setTo(''); setProblemType('') }}>Весь период</button>
       </div>
       {error && <div className="card error">Ошибка: {error}</div>}
       {!data && !error && <LoadState error="" />}

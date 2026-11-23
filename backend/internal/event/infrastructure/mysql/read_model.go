@@ -16,8 +16,8 @@ type readModel struct{ db *sql.DB }
 func (r *readModel) GetEvent(ctx context.Context, id int) (query.EventView, error) {
 	var v query.EventView
 	err := r.db.QueryRowContext(ctx,
-		"SELECT id, type_id, title, starts_at, place, max_people FROM event WHERE id = ?", id).
-		Scan(&v.ID, &v.TypeID, &v.Title, &v.StartsAt, &v.Place, &v.MaxPeople)
+		"SELECT e.id, e.type_id, et.name, e.title, e.starts_at, e.place, e.max_people FROM event e LEFT JOIN event_type et ON et.id = e.type_id WHERE e.id = ?", id).
+		Scan(&v.ID, &v.TypeID, &v.TypeName, &v.Title, &v.StartsAt, &v.Place, &v.MaxPeople)
 	if errors.Is(err, sql.ErrNoRows) {
 		return query.EventView{}, domain.ErrNotFound
 	}
@@ -29,7 +29,7 @@ func (r *readModel) GetEvent(ctx context.Context, id int) (query.EventView, erro
 
 func (r *readModel) ListEvents(ctx context.Context) ([]query.EventView, error) {
 	rows, err := r.db.QueryContext(ctx,
-		"SELECT id, type_id, title, starts_at, place, max_people FROM event ORDER BY starts_at DESC")
+		"SELECT e.id, e.type_id, et.name, e.title, e.starts_at, e.place, e.max_people FROM event e LEFT JOIN event_type et ON et.id = e.type_id ORDER BY e.starts_at DESC")
 	if err != nil {
 		return nil, err
 	}
@@ -37,7 +37,7 @@ func (r *readModel) ListEvents(ctx context.Context) ([]query.EventView, error) {
 	var result []query.EventView
 	for rows.Next() {
 		var v query.EventView
-		if err := rows.Scan(&v.ID, &v.TypeID, &v.Title, &v.StartsAt, &v.Place, &v.MaxPeople); err != nil {
+		if err := rows.Scan(&v.ID, &v.TypeID, &v.TypeName, &v.Title, &v.StartsAt, &v.Place, &v.MaxPeople); err != nil {
 			return nil, err
 		}
 		result = append(result, v)
@@ -47,7 +47,7 @@ func (r *readModel) ListEvents(ctx context.Context) ([]query.EventView, error) {
 
 func (r *readModel) EventsByMother(ctx context.Context, motherID int) ([]query.EventView, error) {
 	rows, err := r.db.QueryContext(ctx,
-		"SELECT "+eventColumns+" FROM event e JOIN participation p ON p.event_id = e.id WHERE p.mother_id = ? ORDER BY e.starts_at DESC", motherID)
+		"SELECT e.id, e.type_id, et.name, e.title, e.starts_at, e.place, e.max_people FROM event e JOIN participation p ON p.event_id = e.id LEFT JOIN event_type et ON et.id = e.type_id WHERE p.mother_id = ? ORDER BY e.starts_at DESC", motherID)
 	if err != nil {
 		return nil, err
 	}
@@ -55,7 +55,7 @@ func (r *readModel) EventsByMother(ctx context.Context, motherID int) ([]query.E
 	var result []query.EventView
 	for rows.Next() {
 		var v query.EventView
-		if err := rows.Scan(&v.ID, &v.TypeID, &v.Title, &v.StartsAt, &v.Place, &v.MaxPeople); err != nil {
+		if err := rows.Scan(&v.ID, &v.TypeID, &v.TypeName, &v.Title, &v.StartsAt, &v.Place, &v.MaxPeople); err != nil {
 			return nil, err
 		}
 		result = append(result, v)

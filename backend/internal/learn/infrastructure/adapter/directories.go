@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"backend/internal/learn/domain"
+	motherhttp "backend/internal/mother/interfaces/httpapi"
 	motherquery "backend/internal/mother/application/query"
 )
 
@@ -31,4 +32,29 @@ func (a *MotherDirectoryAdapter) GetAllMothers(ctx context.Context) ([]domain.Mo
 		}
 	}
 	return domainRefs, nil
+}
+
+type LearnerReader struct {
+	reader domain.ReadRepository
+}
+
+func NewLearnerReader(reader domain.ReadRepository) *LearnerReader {
+	return &LearnerReader{reader: reader}
+}
+
+func (a *LearnerReader) GetAllLearners(ctx context.Context) ([]motherhttp.LearnerDTO, error) {
+	learners, err := a.reader.GetAllLearners(ctx)
+	if err != nil {
+		return nil, err
+	}
+	dtos := make([]motherhttp.LearnerDTO, len(learners))
+	for i, l := range learners {
+		dtos[i] = motherhttp.LearnerDTO{
+			UserID:    l.UserId,
+			FirstName: l.FirstName,
+			LastName:  l.LastName,
+			Email:     l.Email,
+		}
+	}
+	return dtos, nil
 }

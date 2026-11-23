@@ -1565,3 +1565,415 @@ tr.clickable:hover td {
   font-size: 13px;
   color: var(--mom-text-secondary);
 }
+
+.ipr-page {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.ipr-section-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.section-icon {
+  font-size: 20px;
+}
+
+.ipr-card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.ipr-card {
+  padding: 24px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--white);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+
+.ipr-card-header {
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+}
+
+.ipr-card-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.ipr-plan-title {
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0;
+  color: var(--text);
+}
+
+.ipr-status-badge {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 20px;
+  background: var(--yellow-bg);
+  color: var(--yellow-text);
+}
+
+.ipr-status-active {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.ipr-status-done {
+  background: var(--success-light);
+  color: var(--success);
+}
+
+.ipr-mentor {
+  margin-top: 8px;
+  font-size: 14px;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ipr-meta-row {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.ipr-meta-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.ipr-meta-icon {
+  font-size: 16px;
+}
+
+.ipr-progress-section {
+  margin-bottom: 20px;
+}
+
+.ipr-progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+
+.ipr-progress-label {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.ipr-progress-percent {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--green);
+}
+
+.ipr-progress-track {
+  height: 10px;
+  background: var(--bg);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+
+.ipr-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--green), #3b82f6);
+  border-radius: 10px;
+  transition: width 0.4s ease;
+  min-width: 2px;
+}
+
+.ipr-progress-done {
+  background: linear-gradient(90deg, var(--success), #22c55e);
+}
+
+.ipr-progress-detail {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.ipr-goals-section {
+  margin-bottom: 20px;
+}
+
+.ipr-section-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.ipr-goals-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ipr-goal-chip {
+  font-size: 13px;
+  padding: 5px 12px;
+  border-radius: 20px;
+  background: var(--green-light);
+  color: var(--green-dark);
+  font-weight: 500;
+}
+
+.ipr-stages-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ipr-stage {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.ipr-stage-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: var(--bg);
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--text);
+  text-align: left;
+  transition: background 0.15s;
+}
+
+.ipr-stage-header:hover {
+  background: var(--yellow-bg);
+}
+
+.stage-arrow {
+  font-size: 12px;
+  color: var(--muted);
+  flex-shrink: 0;
+  width: 16px;
+  text-align: center;
+}
+
+.stage-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.stage-title {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.stage-dates {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.stage-progress-mini {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.stage-progress-track {
+  width: 60px;
+  height: 6px;
+  background: var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.stage-progress-fill {
+  height: 100%;
+  background: var(--green);
+  border-radius: 6px;
+  transition: width 0.3s ease;
+}
+
+.stage-progress-text {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  min-width: 30px;
+  text-align: right;
+}
+
+.ipr-tasks {
+  padding: 8px 0;
+}
+
+.ipr-task {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px 10px 28px;
+  border-top: 1px solid var(--border);
+  transition: background 0.15s;
+}
+
+.ipr-task:hover {
+  background: #fafafa;
+}
+
+.task-completed {
+  opacity: 0.7;
+}
+
+.task-overdue {
+  background: #fff5f5;
+}
+
+.ipr-task-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.task-check {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  flex-shrink: 0;
+  border: 2px solid var(--border);
+  color: var(--muted);
+}
+
+.check-done {
+  border-color: var(--success);
+  background: var(--success-light);
+  color: var(--success);
+}
+
+.check-progress {
+  border-color: #3b82f6;
+  background: #dbeafe;
+  color: #3b82f6;
+}
+
+.ipr-task-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.task-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.task-desc-text {
+  font-size: 13px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ipr-task-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.task-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 12px;
+  white-space: nowrap;
+}
+
+.task-badge-todo {
+  background: var(--bg);
+  color: var(--muted);
+}
+
+.task-badge-progress {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.task-badge-wait {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.task-badge-done {
+  background: var(--success-light);
+  color: var(--success);
+}
+
+.task-due {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.task-done-date {
+  font-size: 12px;
+  color: var(--success);
+  white-space: nowrap;
+}
+
+.ipr-empty {
+  text-align: center;
+  padding: 48px 24px;
+}
+
+.ipr-empty-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+}
+
+.ipr-empty h3 {
+  margin: 0 0 8px;
+  font-size: 17px;
+}

@@ -62,8 +62,6 @@ export default function EventsPage() {
     return { events, types }
   }, [])
   if (!data) return <LoadState error={error} />
-  const typeNames: Record<number, string> = {}
-  for (const t of data.types) typeNames[t.id] = t.name
   const now = new Date()
   const upcomingCount = data.events.filter((e) => new Date(e.starts_at) >= now).length
   return (
@@ -86,7 +84,7 @@ export default function EventsPage() {
                 const isPast = new Date(e.starts_at) < now
                 return (
                   <tr key={e.id} className="clickable" onClick={() => navigate('/events/' + e.id)}>
-                    <td><strong>{e.title}</strong><br /><span className="muted">{typeNames[e.type_id] || ''}</span></td>
+                    <td><strong>{e.title}</strong><br /><span className="muted">{e.type_name || '—'}</span></td>
                     <td>{fmtDateTime(e.starts_at)}</td>
                     <td>{e.place || '—'}</td>
                     <td>{e.max_people || 'без лимита'}</td>

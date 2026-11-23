@@ -1,7 +1,7 @@
 services:
   db:
     image: mysql:8
-    command: --bind-address=127.0.0.1
+    command: --bind-address=127.0.0.1 --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     environment:
       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
       MYSQL_DATABASE: fund
@@ -10,11 +10,16 @@ services:
     volumes:
       - dbdata:/var/lib/mysql
       - ./migrations/init.sql:/docker-entrypoint-initdb.d/001_init.sql
-      - ./migrations/002_add_learn.sql:/docker-entrypoint-initdb.d/002_add_learn.sql
+      - ./migrations/add_learn.sql:/docker-entrypoint-initdb.d/002_add_learn.sql
       - ./migrations/add_photo_url.sql:/docker-entrypoint-initdb.d/003_add_photo_url.sql
       - ./migrations/add_user.sql:/docker-entrypoint-initdb.d/004_add_user.sql
       - ./migrations/seed_admin.sql:/docker-entrypoint-initdb.d/005_seed_admin.sql
       - ./migrations/add_mom_role.sql:/docker-entrypoint-initdb.d/006_add_mom_role.sql
+      - ./migrations/add_mother_learn_link.sql:/docker-entrypoint-initdb.d/007_add_mother_learn_link.sql
+      - ./migrations/add_soft_delete.sql:/docker-entrypoint-initdb.d/008_add_soft_delete.sql
+      - ./migrations/add_ipr.sql:/docker-entrypoint-initdb.d/009_add_ipr.sql
+      - ./migrations/add_consultation.sql:/docker-entrypoint-initdb.d/010_add_consultation.sql
+      - ./migrations/add_problem_type.sql:/docker-entrypoint-initdb.d/011_add_problem_type.sql
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$$MYSQL_ROOT_PASSWORD"]
       interval: 5s

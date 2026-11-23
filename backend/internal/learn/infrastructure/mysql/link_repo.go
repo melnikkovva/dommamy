@@ -42,3 +42,10 @@ func (r *MotherLearnLinkRepo) IsLinked(ctx context.Context, motherID int) (bool,
 	).Scan(&count)
 	return count > 0, err
 }
+
+func (r *MotherLearnLinkRepo) Unlink(ctx context.Context, motherID int) error {
+	_, err := r.db.ExecContext(ctx,
+		`DELETE FROM mother_learn_link WHERE mother_id = ?`, motherID,
+	)
+	return err
+}

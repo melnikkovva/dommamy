@@ -84,12 +84,7 @@ export default function CoursesTab({ motherId }: { motherId: number }) {
 
       {courses.length === 0 && (
         <div className="card">
-          <h2>Другие курсы</h2>
-          <div className="empty-courses">
-            <span className="empty-icon">📖</span>
-            <span className="muted">Новых курсов пока нет</span>
-            <button className="btn">Добавить курс</button>
-          </div>
+          <p className="muted">Нет курсов</p>
         </div>
       )}
     </div>

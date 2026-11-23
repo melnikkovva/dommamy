@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { createContext, useContext, useState, ReactNode } from 'react'
 import { login as apiLogin, clearAuth, setAuth, getUser, AuthUser } from '../api/auth'
 import { errorText } from '../api/client'
 
@@ -20,12 +20,6 @@ const AuthContext = createContext<AuthContextType>({
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(getUser())
-
-  useEffect(() => {
-    if (user) {
-      setAuth('', user)
-    }
-  }, [user])
 
   const doLogin = async (loginStr: string, password: string): Promise<string> => {
     try {

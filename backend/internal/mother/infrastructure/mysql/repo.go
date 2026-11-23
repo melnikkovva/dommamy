@@ -40,3 +40,8 @@ func (r *Repository) UpdatePhotoURL(ctx context.Context, id int, photoURL string
 	_, err := r.db.ExecContext(ctx, `UPDATE mother SET photo_url = ? WHERE id = ?`, photoURL, id)
 	return err
 }
+
+func (r *Repository) SoftDelete(ctx context.Context, id int) error {
+	_, err := r.db.ExecContext(ctx, `UPDATE mother SET deleted_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NULL`, id)
+	return err
+}

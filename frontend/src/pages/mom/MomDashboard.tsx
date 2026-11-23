@@ -8,7 +8,7 @@ import { getMotherRequests } from '../../api/help'
 import { getEvents, getMotherEvents } from '../../api/events'
 import { getDocuments } from '../../api/documents'
 import { getCourses } from '../../api/mothers'
-import { kindNames, label, requestStatusNames } from '../../utils/labels'
+import { kindNames, label, requestStatusNames, sumText } from '../../utils/labels'
 import { fmtDate, fmtDateTime, ageYears, yearsText } from '../../utils/format'
 import { useToast } from '../../components/Toast'
 import { createRequest } from '../../api/help'
@@ -121,8 +121,11 @@ export default function MomDashboard() {
 
   const requestKinds = [
     { key: 'food', label: 'Продукты' },
-    { key: 'clothes', label: 'Одежда' },
+    { key: 'clothes', label: 'Вещи' },
     { key: 'furniture', label: 'Мебель' },
+    { key: 'stationery', label: 'Канцелярия' },
+    { key: 'gifts', label: 'Подарки' },
+    { key: 'consultation', label: 'Консультация' },
     { key: 'other', label: 'Другое' },
   ]
 
@@ -261,7 +264,7 @@ export default function MomDashboard() {
                     <div key={h.id} className="card">
                       <p className="muted">{fmtDate(h.created_at)}</p>
                       <p style={{ fontSize: '17px', fontWeight: 600, margin: '4px 0' }}>
-                        {label(kindNames, h.kind)}  {h.sum} {h.kind === 'food' ? '₽' : 'шт.'}
+                        {label(kindNames, h.kind)}  {sumText(h.kind, h.sum)}
                       </p>
                       <span className="badge badge-ok">Выдано</span>
                       <p className="muted">Для{childrenText ? ' ' + childrenText : ' вас'}</p>
@@ -303,7 +306,7 @@ export default function MomDashboard() {
                   <div key={h.id} className="event-item">
                     <p className="muted">{fmtDate(h.created_at)}</p>
                     <p style={{ fontSize: '16px', fontWeight: 600, margin: '4px 0' }}>
-                      {label(kindNames, h.kind)}  {h.sum} {h.kind === 'food' ? '₽' : 'шт.'}
+                      {label(kindNames, h.kind)}  {sumText(h.kind, h.sum)}
                     </p>
                     <span className="badge badge-ok">Выдано</span>
                     <p className="muted">Для{childrenText ? ' ' + childrenText : ' семьи'}</p>
@@ -360,6 +363,7 @@ export default function MomDashboard() {
                   {events.map((ev: any) => (
                     <div key={ev.id} className="event-item">
                       <p className="event-name">{ev.title}</p>
+                      {ev.type_name && <p className="muted" style={{fontSize: 12}}>🏷 {ev.type_name}</p>}
                       <p className="muted">{fmtDateTime(ev.starts_at)}</p>
                       <p className="muted">📍 {ev.place || 'Центр'}</p>
                       <span className="badge badge-wait">Записана</span>
@@ -376,6 +380,7 @@ export default function MomDashboard() {
                   .map((ev: any) => (
                     <div key={ev.id} className="event-item">
                       <p className="event-name">{ev.title}</p>
+                      {ev.type_name && <p className="muted" style={{fontSize: 12}}>🏷 {ev.type_name}</p>}
                       <p className="muted">{fmtDateTime(ev.starts_at)}</p>
                       <p className="muted">📍 {ev.place || 'Центр'}</p>
                       <p className="muted">Свободно {ev.max_people > 0 ? ev.max_people : '—'} мест из {ev.max_people || '—'}</p>

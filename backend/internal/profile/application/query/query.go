@@ -24,6 +24,7 @@ type ProfileView struct {
 	FatherInfo     string    `json:"father_info"`
 	PregnancyWeeks int       `json:"pregnancy_weeks"`
 	Situation      string    `json:"situation"`
+	ProblemType    string    `json:"problem_type"`
 	ExpectedHelp   string    `json:"expected_help"`
 	Source         string    `json:"source"`
 	Status         domain.Status `json:"status"`

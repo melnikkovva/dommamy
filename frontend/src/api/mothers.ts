@@ -1,16 +1,25 @@
-import { get, getList, post, put } from './client'
+import { get, getList, post, put, remove, send } from './client'
 import type { Child, CourseItem, IprPlan, Mother, MotherStatusInfo, MotherStatusItem, Profile, ProfileSummary, SecretInfo } from '../types'
 
-export const getMothers = (q = '') => getList<Mother>('/api/mother?q=' + encodeURIComponent(q))
-export const createMother = (first_name: string, last_name: string, phone: string) =>
-  post<Mother>('/api/mother', { first_name, last_name, phone })
+export const getMothers = (q = '', phone = '', profileStatus = '', motherStatus = '') => {
+  const params = new URLSearchParams()
+  if (q) params.set('q', q)
+  if (phone) params.set('phone', phone)
+  if (profileStatus) params.set('profileStatus', profileStatus)
+  if (motherStatus) params.set('motherStatus', motherStatus)
+  return getList<Mother>('/api/mother?' + params.toString())
+}
+export const createMother = (first_name: string, last_name: string, phone: string, email: string) =>
+  post<Mother>('/api/mother', { first_name, last_name, phone, email })
+export const getLearners = () => getList<{ user_id: string; first_name: string; last_name: string; email: string }>('/api/learners')
+export const linkLearnUser = (motherId: number, learnUserId: string) =>
+  put<{ status: string }>('/api/mother/' + motherId + '/learn-link', { learn_user_id: learnUserId })
+export const unlinkLearnUser = (motherId: number) =>
+  remove('/api/mother/' + motherId + '/learn-link')
 export const uploadPhoto = (motherId: number, file: File) => {
-  const formData = new FormData()
-  formData.append('photo', file)
-  return fetch('/api/mother/' + motherId + '/photo', { method: 'POST', body: formData }).then((res) => {
-    if (!res.ok) return res.json().then((e) => { throw new Error(e.error || 'upload failed') })
-    return res.json()
-  })
+  const form = new FormData()
+  form.append('photo', file)
+  return send('POST', '/api/mother/' + motherId + '/photo', form)
 }
 export const getChildren = (motherId: number) => getList<Child>('/api/mother/' + motherId + '/children')
 export const addChild = (motherId: number, first_name: string, birth_date: string) =>
@@ -30,3 +39,4 @@ export const setMotherStatus = (motherId: number, status: string, reason: string
 export const getMotherStatuses = () => getList<MotherStatusItem>('/api/mother-statuses')
 export const getCourses = (motherId: number) => getList<CourseItem>('/api/mother/' + motherId + '/courses')
 export const getIPR = (motherId: number) => getList<IprPlan>('/api/mother/' + motherId + '/ipr')
+export const deleteMother = (motherId: number) => remove(`/api/mother/${motherId}`)

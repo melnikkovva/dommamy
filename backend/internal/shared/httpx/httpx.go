@@ -10,6 +10,8 @@ import (
 )
 
 const APITime = time.RFC3339
+const LocalDateTime = "2006-01-02T15:04" 
+const LocalDate = "2006-01-02" 
 
 const MaxBodySize = 1 << 20 // 1 MB
 
@@ -22,7 +24,7 @@ type errorBody struct {
 }
 
 func WriteJSON(w http.ResponseWriter, status int, v any) {
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(v); err != nil {
 		log.Println("write json:", err)

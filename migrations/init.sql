@@ -1,3 +1,5 @@
+SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS mother (
     id INT AUTO_INCREMENT PRIMARY KEY, 
     first_name VARCHAR(50) NOT NULL, 
@@ -165,6 +167,7 @@ CREATE TABLE IF NOT EXISTS lms_learners (
     last_name VARCHAR(100),
     email VARCHAR(255),
     login VARCHAR(100),
+    phone VARCHAR(100),
     status INT,
     added_date DATETIME,
     last_login_date DATETIME,

@@ -9,14 +9,17 @@ import (
 type Kind string
 
 const (
-	KindFood      Kind = "food"
-	KindClothes   Kind = "clothes"
-	KindFurniture Kind = "furniture"
-	KindOther     Kind = "other"
+	KindFood         Kind = "food"
+	KindClothes      Kind = "clothes"
+	KindFurniture    Kind = "furniture"
+	KindStationery   Kind = "stationery"
+	KindGifts        Kind = "gifts"
+	KindConsultation Kind = "consultation"
+	KindOther        Kind = "other"
 )
 
 func (k Kind) Valid() bool {
-	return slices.Contains([]Kind{KindFood, KindClothes, KindFurniture, KindOther}, k)
+	return slices.Contains([]Kind{KindFood, KindClothes, KindFurniture, KindStationery, KindGifts, KindConsultation, KindOther}, k)
 }
 
 type Source string

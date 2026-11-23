@@ -2,6 +2,9 @@ export const kindNames: Record<string, string> = {
   food: 'Продукты',
   clothes: 'Вещи',
   furniture: 'Мебель',
+  stationery: 'Канцелярия',
+  gifts: 'Подарки',
+  consultation: 'Консультация',
   other: 'Другое'
 }
 export const profileStatusNames: Record<string, string> = {
@@ -39,5 +42,7 @@ export function label(names: Record<string, string>, key: string) {
   return names[key] || key
 }
 export function sumText(kind: string, sum: number) {
-  return kind === 'food' ? sum + ' ₽' : sum + ' шт.'
+  if (kind === 'food') return sum + ' ₽'
+  if (kind === 'consultation') return String(sum) + ' визитов'
+  return sum + ' шт.'
 }

@@ -11,16 +11,17 @@ export default function EventsTab({ motherId }: { motherId: number }) {
     <div className="card">
       <h2>Мероприятия · {data.length}</h2>
       <table>
-        <thead><tr><th>Дата и время</th><th>Мероприятие</th><th>Место</th></tr></thead>
+        <thead><tr><th>Дата и время</th><th>Тип</th><th>Мероприятие</th><th>Место</th></tr></thead>
         <tbody>
           {data.map((e) => (
             <tr key={e.id}>
               <td>{fmtDateTime(e.starts_at)}</td>
+              <td>{e.type_name || '—'}</td>
               <td><Link to={'/events/' + e.id}><strong>{e.title}</strong></Link></td>
               <td>{e.place || '—'}</td>
             </tr>
           ))}
-          {data.length === 0 && <tr><td colSpan={3} className="muted">Мама пока не записана ни на одно мероприятие</td></tr>}
+          {data.length === 0 && <tr><td colSpan={4} className="muted">Мама пока не записана ни на одно мероприятие</td></tr>}
         </tbody>
       </table>
     </div>

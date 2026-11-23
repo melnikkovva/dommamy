@@ -61,7 +61,10 @@ func (h *Handler) add(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusBadRequest, "incorrect JSON")
 		return
 	}
-	birth, err := time.Parse(httpx.APITime, req.BirthDate)
+	birth, err := time.Parse(httpx.LocalDate, req.BirthDate)
+	if err != nil {
+		birth, err = time.Parse(httpx.APITime, req.BirthDate)
+	}
 	if err != nil {
 		httpx.WriteError(w, http.StatusUnprocessableEntity, "specify the date of birth")
 		return

@@ -5,7 +5,7 @@ export class ApiError extends Error {
     this.status = status
   }
 }
-async function send<T>(method: string, url: string, body?: BodyInit, headers?: Record<string, string>): Promise<T> {
+export async function send<T>(method: string, url: string, body?: BodyInit, headers?: Record<string, string>): Promise<T> {
   const token = localStorage.getItem('auth_token')
   const mergedHeaders = { ...headers }
   if (token) {
@@ -43,6 +43,9 @@ export function upload<T>(url: string, file: File) {
   const form = new FormData()
   form.append('file', file)
   return send<T>('POST', url, form)
+}
+export function remove<T>(url: string) {
+  return send<T>('DELETE', url)
 }
 export function errorText(e: unknown) {
   return e instanceof Error ? e.message : 'Неизвестная ошибка'

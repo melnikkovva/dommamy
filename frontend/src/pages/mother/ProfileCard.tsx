@@ -35,8 +35,28 @@ const nextSteps: Record<string, [string, string][]> = {
   checked: [['sent', 'Вернуть на проверку']]
 }
 
+const problemTypeOptions = [
+  { value: '', label: '— не выбран —' },
+  { value: 'housing', label: 'Жилищная' },
+  { value: 'unemployment', label: 'Безработица' },
+  { value: 'single_parent', label: 'Одинокая мама' },
+  { value: 'low_income', label: 'Низкий доход' },
+  { value: 'violence', label: 'Насилие' },
+  { value: 'other', label: 'Другое' }
+]
+
+const problemTypeLabels: Record<string, string> = {
+  '': 'Не указана',
+  housing: 'Жилищная',
+  unemployment: 'Безработица',
+  single_parent: 'Одинокая мама',
+  low_income: 'Низкий доход',
+  violence: 'Насилие',
+  other: 'Другое'
+}
+
 function toForm(profile: Profile) {
-  const form: Record<string, string> = { situation: profile.situation, expected_help: profile.expected_help }
+  const form: Record<string, string> = { situation: profile.situation, problem_type: profile.problem_type, expected_help: profile.expected_help }
   for (const f of fields) {
     const value = profile[f.key]
     form[f.key] = value === 0 ? '' : String(value)
@@ -52,7 +72,7 @@ function ProfileModal({ motherId, profile, onClose, onSaved }: { motherId: numbe
   }
   async function submit(e: FormEvent) {
     e.preventDefault()
-    const body: Record<string, string | number> = { situation: form.situation, expected_help: form.expected_help }
+    const body: Record<string, string | number> = { situation: form.situation, problem_type: form.problem_type, expected_help: form.expected_help }
     for (const f of fields) {
       body[f.key] = f.type === 'number' ? Number(form[f.key]) : form[f.key]
     }
@@ -75,6 +95,13 @@ function ProfileModal({ motherId, profile, onClose, onSaved }: { motherId: numbe
           ))}
         </div>
         <Field label="Опишите ситуацию"><textarea rows={3} value={form.situation} onChange={(e) => change('situation', e.target.value)} /></Field>
+        <Field label="Тип проблемы">
+          <select value={form.problem_type} onChange={(e) => change('problem_type', e.target.value)}>
+            {problemTypeOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+        </Field>
         <Field label="Какую помощь ждёте от центра"><textarea rows={3} value={form.expected_help} onChange={(e) => change('expected_help', e.target.value)} /></Field>
         <div className="dialog-buttons">
           <button type="button" className="btn" onClick={onClose}>Отмена</button>
@@ -114,6 +141,8 @@ export default function ProfileCard({ motherId, profile, onChanged }: { motherId
       })}
       <div className="field-label">Что сейчас важно</div>
       <div>{profile.situation || '—'}</div>
+      <div className="field-label">Тип проблемы</div>
+      <div>{problemTypeLabels[profile.problem_type] || '—'}</div>
       <div className="field-label">Какую помощь ждёт от центра</div>
       <div>{profile.expected_help || '—'}</div>
       <div className="actions" style={{ marginTop: 16 }}>

@@ -1,4 +1,4 @@
-export type Mother = { id: number; first_name: string; last_name: string; phone: string; photo_url?: string; created_at: string }
+export type Mother = { id: number; first_name: string; last_name: string; phone: string; email: string; photo_url?: string; created_at: string; profile_status: string; mother_status: string; learn_user_id?: string }
 export type Child = { id: number; mother_id: number; first_name: string; birth_date: string }
 export type SecretInfo = { criminal_record: string; nd_pnd: string; drugs: string; chronic_diseases: string }
 export type HelpItem = { id: number; mother_id: number; kind: string; sum: number; check_url: string; created_at: string }
@@ -18,6 +18,7 @@ export type ProfileForm = {
   father_info: string
   pregnancy_weeks: number
   situation: string
+  problem_type: string
   expected_help: string
   source: string
 }
@@ -39,7 +40,7 @@ export type HelpRequest = {
   updated_at: string
 }
 export type EventType = { id: number; name: string }
-export type EventItem = { id: number; type_id: number; title: string; starts_at: string; place: string; max_people: number }
+export type EventItem = { id: number; type_id: number; type_name: string; title: string; starts_at: string; place: string; max_people: number }
 export type Participant = { mother_id: number; status: string }
 export type DocumentItem = {
   id: number

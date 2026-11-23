@@ -32,6 +32,7 @@ export default function HelpPage() {
   const chosenRequest = openRequests.find((r) => String(r.id) === requestId)
   const history = [...data.help].sort((a, b) => b.id - a.id)
   const isFood = kind === 'food'
+  const isConsultation = kind === 'consultation'
   async function submit(e: FormEvent) {
     e.preventDefault()
     let item
@@ -80,14 +81,19 @@ export default function HelpPage() {
                 <option value="food">Продукты</option>
                 <option value="clothes">Вещи</option>
                 <option value="furniture">Мебель</option>
+                <option value="stationery">Канцелярия</option>
+                <option value="gifts">Подарки</option>
+                <option value="consultation">Консультация</option>
               </select>
             </Field>
-            <Field label={isFood ? 'Сумма по чеку, ₽ *' : 'Количество, шт. *'}>
+            <Field label={isFood ? 'Сумма по чеку, ₽ *' : isConsultation ? 'Количество визитов *' : 'Количество, шт. *'}>
               <input type="number" min="1" value={sum} onChange={(e) => setSum(e.target.value)} required />
             </Field>
-            <Field label="Чек (имя файла или ссылка)">
-              <input value={checkUrl} onChange={(e) => setCheckUrl(e.target.value)} />
-            </Field>
+            {isFood && (
+              <Field label="Чек (имя файла или ссылка)">
+                <input value={checkUrl} onChange={(e) => setCheckUrl(e.target.value)} />
+              </Field>
+            )}
             <Field label="Закрыть заявку этой выдачей">
               <select value={chosenRequest ? requestId : ''} onChange={(e) => setRequestId(e.target.value)}>
                 <option value="">Без заявки</option>

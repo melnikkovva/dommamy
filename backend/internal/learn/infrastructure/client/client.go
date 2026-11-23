@@ -397,7 +397,7 @@ func (c *Client) fetchIPRDetails(ctx context.Context, planIDs []string) ([]domai
 		return nil, err
 	}
 
-	var apiResp struct {
+ var apiResp struct {
 		Items []struct {
 			PlanID       string   `json:"id"`
 			Title        string   `json:"title"`
@@ -407,9 +407,10 @@ func (c *Client) fetchIPRDetails(ctx context.Context, planIDs []string) ([]domai
 			StartDate    string   `json:"startDate"`
 			EndDate      *string  `json:"endDate"`
 			Status       string   `json:"status"`
-			Progress     float64  `json:"progress"`
-			CompletedTasks int    `json:"completedTasksCount"`
-			TotalTasks   int      `json:"totalTasksCount"`
+			Progress     struct {
+				CompletedTasksCount int `json:"completedTasksCount"`
+				TotalTasksCount     int `json:"totalTasksCount"`
+			} `json:"progress"`
 			Goals        []string `json:"goals"`
 			Stages       []struct {
 				StageID     string   `json:"id"`
@@ -500,6 +501,10 @@ func (c *Client) fetchIPRDetails(ctx context.Context, planIDs []string) ([]domai
 			})
 		}
 
+		var progress float64
+		if item.Progress.TotalTasksCount > 0 {
+			progress = float64(item.Progress.CompletedTasksCount) / float64(item.Progress.TotalTasksCount) * 100
+		}
 		plans = append(plans, domain.IPRPlan{
 			PlanID:         item.PlanID,
 			Title:          item.Title,
@@ -509,9 +514,9 @@ func (c *Client) fetchIPRDetails(ctx context.Context, planIDs []string) ([]domai
 			StartDate:      startDate,
 			EndDate:        endDate,
 			Status:         item.Status,
-			Progress:       item.Progress,
-			CompletedTasks: item.CompletedTasks,
-			TotalTasks:     item.TotalTasks,
+			Progress:       progress,
+			CompletedTasks: item.Progress.CompletedTasksCount,
+			TotalTasks:     item.Progress.TotalTasksCount,
 			Goals:          item.Goals,
 			Stages:         stages,
 		})

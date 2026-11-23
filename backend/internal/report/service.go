@@ -9,7 +9,8 @@ type Repository interface {
 	AidRows(from, to string) ([]AidRow, error)
 	AidTotals(from, to string) ([]KindTotal, error)
 	EventRows(from, to string) ([]EventRow, error)
-	MotherRows(from, to string) ([]MotherRow, error)
+	MotherRows(from, to, problemType string) ([]MotherRow, error)
+	ProblemTypeTotals(from, to, problemType string) ([]ProblemTypeTotal, error)
 }
 
 type Service struct {
@@ -31,7 +32,7 @@ func (s *Service) Build(name string, f Filter) (*Report, error) {
 	case "events":
 		return s.events(from, to)
 	case "mothers":
-		return s.mothers(from, to)
+		return s.mothers(from, to, f.ProblemType)
 	}
 	return nil, ErrorUnknown
 }
@@ -108,33 +109,60 @@ func (s *Service) events(from, to string) (*Report, error) {
 	return rep, nil
 }
 
-func (s *Service) mothers(from, to string) (*Report, error) {
-	rows, err := s.repo.MotherRows(from, to)
+func (s *Service) mothers(from, to, problemType string) (*Report, error) {
+	rows, err := s.repo.MotherRows(from, to, problemType)
+	if err != nil {
+		return nil, err
+	}
+	ptTotals, err := s.repo.ProblemTypeTotals(from, to, problemType)
 	if err != nil {
 		return nil, err
 	}
 	rep := &Report{
 		Name: "mothers",
 		Title: "Подопечные",
-		Headers: []string{"№", "Мама", "Телефон", "Обратилась", "Детей", "Ситуация", "Источник дохода", "Доход, ₽", "Анкета", "Статус", "Выдач помощи"},
+		Headers: []string{"№", "Мама", "Телефон", "Обратилась", "Детей", "Тип проблемы", "Ситуация", "Источник дохода", "Доход, ₽", "Анкета", "Статус", "Выдач помощи", "Заявок", "Консультаций", "Психолог", "Юрист", "Батюшка", "Центр занятости", "Мероприятий"},
 		Rows: [][]string{},
 		Totals: []Total{},
 	}
-	children, active := 0, 0
+	children, active, totalRequests, totalConsultations, totalEvents := 0, 0, 0, 0, 0
+	totalPsychologist, totalLawyer, totalPriest, totalEmployment := 0, 0, 0, 0
 	for _, r := range rows {
 		children += r.Children
+		totalRequests += r.RequestCount
+		totalConsultations += r.ConsultationCount
+		totalEvents += r.EventCount
+		totalPsychologist += r.PsychologistCount
+		totalLawyer += r.LawyerCount
+		totalPriest += r.PriestCount
+		totalEmployment += r.EmploymentCount
 		if r.Status == "active" {
 			active++
 		}
 		rep.Rows = append(rep.Rows, []string{
-			strconv.Itoa(r.Id), r.Name, r.Phone, r.Registered, strconv.Itoa(r.Children), r.Situation,
+			strconv.Itoa(r.Id), r.Name, r.Phone, r.Registered, strconv.Itoa(r.Children),
+			label(problemTypeNames, r.ProblemType), r.Situation,
 			r.IncomeSource, strconv.Itoa(r.Income), label(profileStatusNames, r.ProfileStatus),
 			label(motherStatusNames, r.Status), strconv.Itoa(r.HelpCount),
+			strconv.Itoa(r.RequestCount), strconv.Itoa(r.ConsultationCount),
+			strconv.Itoa(r.PsychologistCount), strconv.Itoa(r.LawyerCount),
+			strconv.Itoa(r.PriestCount), strconv.Itoa(r.EmploymentCount),
+			strconv.Itoa(r.EventCount),
 		})
+	}
+	for _, pt := range ptTotals {
+		rep.Totals = append(rep.Totals, Total{label(problemTypeNames, pt.ProblemType), strconv.Itoa(pt.Count)})
 	}
 	rep.Totals = append(rep.Totals,
 		Total{"Всего мам", strconv.Itoa(len(rows))},
 		Total{"На сопровождении", strconv.Itoa(active)},
-		Total{"Всего детей", strconv.Itoa(children)})
+		Total{"Всего детей", strconv.Itoa(children)},
+		Total{"Всего заявок", strconv.Itoa(totalRequests)},
+		Total{"Всего консультаций", strconv.Itoa(totalConsultations)},
+		Total{"Психолог", strconv.Itoa(totalPsychologist)},
+		Total{"Юрист", strconv.Itoa(totalLawyer)},
+		Total{"Батюшка", strconv.Itoa(totalPriest)},
+		Total{"Центр занятости", strconv.Itoa(totalEmployment)},
+		Total{"Всего мероприятий", strconv.Itoa(totalEvents)})
 	return rep, nil
 }

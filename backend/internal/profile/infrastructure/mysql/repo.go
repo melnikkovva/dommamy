@@ -24,8 +24,8 @@ func (r *repository) Save(ctx context.Context, p domain.Profile) error {
 		`INSERT INTO mother_profile
 		 (mother_id, birth_date, birth_place, citizenship, registration, living, email,
 		  religion, education, profession, income_source, income_amount, marital_status,
-		  father_info, pregnancy_weeks, situation, expected_help, source, status, updated_at)
-		 VALUES (?, NULLIF(?, ''), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		  father_info, pregnancy_weeks, situation, problem_type, expected_help, source, status, updated_at)
+		 VALUES (?, NULLIF(?, ''), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		 ON DUPLICATE KEY UPDATE
 		 birth_date = VALUES(birth_date), birth_place = VALUES(birth_place),
 		 citizenship = VALUES(citizenship), registration = VALUES(registration),
@@ -34,11 +34,11 @@ func (r *repository) Save(ctx context.Context, p domain.Profile) error {
 		 income_source = VALUES(income_source), income_amount = VALUES(income_amount),
 		 marital_status = VALUES(marital_status), father_info = VALUES(father_info),
 		 pregnancy_weeks = VALUES(pregnancy_weeks), situation = VALUES(situation),
-		 expected_help = VALUES(expected_help), source = VALUES(source),
-		 status = VALUES(status), updated_at = VALUES(updated_at)`,
+		 problem_type = VALUES(problem_type), expected_help = VALUES(expected_help),
+		 source = VALUES(source), status = VALUES(status), updated_at = VALUES(updated_at)`,
 		s.MotherID, s.BirthDate, s.BirthPlace, s.Citizenship, s.Registration, s.Living, s.Email,
 		s.Religion, s.Education, s.Profession, s.IncomeSource, s.IncomeAmount, s.MaritalStatus,
-		s.FatherInfo, s.PregnancyWeeks, s.Situation, s.ExpectedHelp, s.Source, string(s.Status), s.UpdatedAt,
+		s.FatherInfo, s.PregnancyWeeks, s.Situation, s.ProblemType, s.ExpectedHelp, s.Source, string(s.Status), s.UpdatedAt,
 	)
 	return err
 }
@@ -50,7 +50,7 @@ func (r *repository) ByMother(ctx context.Context, motherID int) (domain.Profile
 		`SELECT mother_id, COALESCE(DATE_FORMAT(birth_date, '%Y-%m-%d'), ''), birth_place,
 		        citizenship, registration, living, email, religion, education, profession,
 		        income_source, income_amount, marital_status, father_info, pregnancy_weeks,
-		        situation, expected_help, source, status, updated_at
+		        situation, problem_type, expected_help, source, status, updated_at
 		 FROM mother_profile WHERE mother_id = ?`,
 		motherID,
 	)
@@ -61,7 +61,7 @@ func (r *repository) ByMother(ctx context.Context, motherID int) (domain.Profile
 		&s.MotherID, &s.BirthDate, &s.BirthPlace, &s.Citizenship, &s.Registration,
 		&s.Living, &s.Email, &s.Religion, &s.Education, &s.Profession, &s.IncomeSource,
 		&s.IncomeAmount, &s.MaritalStatus, &s.FatherInfo, &s.PregnancyWeeks,
-		&s.Situation, &s.ExpectedHelp, &s.Source, &statusStr, &updatedAt,
+		&s.Situation, &s.ProblemType, &s.ExpectedHelp, &s.Source, &statusStr, &updatedAt,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.Profile{}, domain.ErrNotFilled

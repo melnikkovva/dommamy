@@ -23,15 +23,16 @@ func NewServer(cfg Config, deps *DependencyContainer) *Server {
 		httpx.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
 
+	mux.Handle("GET /api/photos/{path...}", photosHandler(deps.FilesDir()))
+
 	apiMux := http.NewServeMux()
 	for _, r := range deps.Routers() {
 		r.Register(apiMux)
 	}
-	apiMux.Handle("GET /api/photos/{path...}", photosHandler(deps.FilesDir()))
 
-	apiHandler := httpx.LoggingMiddleware(apiMux)
+	apiHandler := auth.Middleware([]byte(cfg.AuthSecret))(apiMux)
+	apiHandler = httpx.LoggingMiddleware(apiHandler)
 	apiHandler = httpx.RecoverMiddleware(apiHandler)
-	apiHandler = auth.Middleware([]byte(cfg.AuthSecret))(apiHandler)
 
 	mux.Handle("/", apiHandler)
 

@@ -10,6 +10,7 @@ import (
 type EventView struct {
 	ID        int       `json:"id"`
 	TypeID    int       `json:"type_id"`
+	TypeName  string    `json:"type_name"`
 	Title     string    `json:"title"`
 	StartsAt  time.Time `json:"starts_at"`
 	Place     string    `json:"place"`

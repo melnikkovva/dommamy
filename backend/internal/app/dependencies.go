@@ -5,6 +5,8 @@ import (
 	"log"
 	"time"
 
+	consultationmysql "backend/internal/consultation/infrastructure/mysql"
+	consultationhttp "backend/internal/consultation/interfaces/httpapi"
 	"backend/internal/child"
 	childapi "backend/internal/child/api"
 	childmysql "backend/internal/child/mysql"
@@ -94,6 +96,7 @@ func NewDependencyContainer(cfg Config, conns *ConnectionContainer) (*Dependency
 	donorHandler := wireDonor(db)
 	reportHandler := wireReport(db)
 	userHandler := wireUser(db, cfg)
+	consultationHandler := wireConsultation(db)
 
 	syncHandler, linkHandler := wireLearn(db, motherDirectory, cfg)
 
@@ -101,7 +104,7 @@ func NewDependencyContainer(cfg Config, conns *ConnectionContainer) (*Dependency
 		routers: []httpx.Router{
 			helpHandler, motherHandler, secretHandler, childHandler, eventHandler,
 			profileHandler, lifecycleHandler, requestHandler, documentHandler,
-			donorHandler, reportHandler, userHandler,
+			donorHandler, reportHandler, userHandler, consultationHandler,
 		},
 		filesDir:    cfg.FilesDir,
 		learnWorker: NewLearnSyncWorker(syncHandler, linkHandler, isLearnEnabled(cfg), 5*time.Minute),
@@ -114,13 +117,18 @@ func wireMother(db *sql.DB, filesDir string) (motherDirectory *motheradapter.Mot
 	learnStatsAdapter := motheradapter.NewLearnStatsAdapter(learnReadModel)
 	motherReads := mothermysql.NewReadModel(db, learnStatsAdapter)
 	photoStorage := motherstorage.NewLocalStorage(filesDir)
+	linkRepo := learnmysql.NewMotherLearnLinkRepo(db)
+	learnerAdapter := learnadapter.NewLearnerReader(learnReadModel)
 
 	handler = motherhttp.NewHandler(
 		mothercommand.NewCreateHandler(motherRepo),
 		mothercommand.NewUploadPhotoHandler(motherRepo, photoStorage, motherReads),
+		mothercommand.NewSoftDeleteHandler(motherRepo),
 		motherquery.NewGetCoursesHandler(motherReads, learnStatsAdapter),
 		motherquery.NewGetIPRHandler(motherReads, learnStatsAdapter),
 		motherReads,
+		linkRepo,
+		learnerAdapter,
 	)
 	motherDirectory = motheradapter.NewMotherDirectory(motherReads)
 	return
@@ -235,6 +243,10 @@ func wireLearn(db *sql.DB, mothers *motheradapter.MotherDirectory, cfg Config) (
 
 func isLearnEnabled(cfg Config) bool {
 	return cfg.Learn.Enabled()
+}
+
+func wireConsultation(db *sql.DB) httpx.Router {
+	return consultationhttp.NewHandler(consultationmysql.NewRepo(db))
 }
 
 func (d *DependencyContainer) Routers() []httpx.Router        { return d.routers }

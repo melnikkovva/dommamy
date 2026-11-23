@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"io"
 	"log"
 	"net/http"
@@ -12,28 +13,54 @@ import (
 	"backend/internal/shared/httpx"
 )
 
+type LearnLinkRepository interface {
+	Link(ctx context.Context, motherID int, learnUserID string) error
+	GetByMotherID(ctx context.Context, motherID int) (string, error)
+	Unlink(ctx context.Context, motherID int) error
+}
+
+type LearnerReader interface {
+	GetAllLearners(ctx context.Context) ([]LearnerDTO, error)
+}
+
+type LearnerDTO struct {
+	UserID    string `json:"user_id"`
+	FirstName string `json:"first_name"`
+	LastName  string `json:"last_name"`
+	Email     string `json:"email"`
+}
+
 type Handler struct {
 	createHandler   mothercommand.CreateHandler
 	uploadPhotoCmd  mothercommand.UploadPhotoHandler
+	softDeleteCmd   mothercommand.SoftDeleteHandler
 	getCourses      motherquery.GetCoursesHandler
 	getIPR          motherquery.GetIPRHandler
 	reads           motherquery.ReadModel
+	learnLinks      LearnLinkRepository
+	learnerReader   LearnerReader
 	mapper          *httpx.ErrorMapper
 }
 
 func NewHandler(
 	create mothercommand.CreateHandler,
 	uploadPhoto mothercommand.UploadPhotoHandler,
+	softDelete mothercommand.SoftDeleteHandler,
 	getCourses motherquery.GetCoursesHandler,
 	getIPR motherquery.GetIPRHandler,
 	reads motherquery.ReadModel,
+	learnLinks LearnLinkRepository,
+	learnerReader LearnerReader,
 ) *Handler {
 	return &Handler{
 		createHandler:  create,
 		uploadPhotoCmd: uploadPhoto,
+		softDeleteCmd:  softDelete,
 		getCourses:     getCourses,
 		getIPR:         getIPR,
 		reads:          reads,
+		learnLinks:     learnLinks,
+		learnerReader:  learnerReader,
 		mapper: httpx.NewErrorMapper(
 			httpx.WithValidation(domain.ErrName),
 			httpx.WithNotFound(domain.ErrNotFound),
@@ -44,9 +71,27 @@ func NewHandler(
 func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/mother", h.create)
 	mux.HandleFunc("GET /api/mother", h.search)
+	mux.HandleFunc("DELETE /api/mother/{id}", h.softDelete)
 	mux.HandleFunc("POST /api/mother/{id}/photo", h.uploadPhoto)
 	mux.HandleFunc("GET /api/mother/{id}/courses", h.courses)
 	mux.HandleFunc("GET /api/mother/{id}/ipr", h.ipr)
+	mux.HandleFunc("PUT /api/mother/{id}/learn-link", h.linkLearn)
+	mux.HandleFunc("DELETE /api/mother/{id}/learn-link", h.unlinkLearn)
+	mux.HandleFunc("GET /api/learners", h.listLearners)
+}
+
+func (h *Handler) softDelete(w http.ResponseWriter, r *http.Request) {
+	motherID, err := httpx.PathID(r, "id")
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "incorrect id")
+		return
+	}
+	err = h.softDeleteCmd.Handle(r.Context(), mothercommand.SoftDelete{MotherID: motherID})
+	if err != nil {
+		h.mapper.Handle(w, "soft delete mother", err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusNoContent, nil)
 }
 
 type motherRequest struct {
@@ -77,14 +122,16 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 }
 
 type motherSearchResponse struct {
-	ID          int    `json:"id"`
-	FirstName   string `json:"first_name"`
-	LastName    string `json:"last_name"`
-	Phone       string `json:"phone"`
-	Email       string `json:"email"`
-	LearnUserID string `json:"learn_user_id"`
-	PhotoURL    string `json:"photo_url,omitempty"`
-	CreatedAt   string `json:"created_at"`
+	ID            int    `json:"id"`
+	FirstName     string `json:"first_name"`
+	LastName      string `json:"last_name"`
+	Phone         string `json:"phone"`
+	Email         string `json:"email"`
+	LearnUserID   string `json:"learn_user_id"`
+	PhotoURL      string `json:"photo_url,omitempty"`
+	CreatedAt     string `json:"created_at"`
+	ProfileStatus string `json:"profile_status"`
+	MotherStatus  string `json:"mother_status"`
 }
 
 func toSearchResponse(v motherquery.MotherView) motherSearchResponse {
@@ -92,12 +139,18 @@ func toSearchResponse(v motherquery.MotherView) motherSearchResponse {
 		ID: v.ID, FirstName: v.FirstName, LastName: v.LastName,
 		Phone: v.Phone, Email: v.Email, LearnUserID: v.LearnUserID,
 		PhotoURL: v.PhotoURL, CreatedAt: v.CreatedAt.Format(httpx.APITime),
+		ProfileStatus: v.ProfileStatus, MotherStatus: v.MotherStatus,
 	}
 }
 
 func (h *Handler) search(w http.ResponseWriter, r *http.Request) {
-	q := r.URL.Query().Get("q")
-	views, err := h.reads.Search(r.Context(), q)
+	filter := motherquery.MotherFilter{
+		Q:             r.URL.Query().Get("q"),
+		Phone:         r.URL.Query().Get("phone"),
+		ProfileStatus: r.URL.Query().Get("profileStatus"),
+		MotherStatus:  r.URL.Query().Get("motherStatus"),
+	}
+	views, err := h.reads.Search(r.Context(), filter)
 	if err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "server error")
 		return
@@ -316,5 +369,69 @@ func (h *Handler) uploadPhoto(w http.ResponseWriter, r *http.Request) {
 		h.mapper.Handle(w, "upload photo", err)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]string{"photo_url": photoURL})
+ httpx.WriteJSON(w, http.StatusOK, map[string]string{"photo_url": photoURL})
+}
+
+type linkLearnRequest struct {
+	LearnUserID string `json:"learn_user_id"`
+}
+
+func (h *Handler) linkLearn(w http.ResponseWriter, r *http.Request) {
+	motherID, err := httpx.PathID(r, "id")
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "incorrect id")
+		return
+	}
+	req, err := httpx.ReadJSON[linkLearnRequest](w, r)
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "incorrect JSON")
+		return
+	}
+	if req.LearnUserID == "" {
+		httpx.WriteError(w, http.StatusUnprocessableEntity, "specify learn_user_id")
+		return
+	}
+	if err := h.learnLinks.Link(r.Context(), motherID, req.LearnUserID); err != nil {
+		log.Printf("link learn error: %v", err)
+		httpx.WriteError(w, http.StatusInternalServerError, "server error")
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+func (h *Handler) unlinkLearn(w http.ResponseWriter, r *http.Request) {
+	motherID, err := httpx.PathID(r, "id")
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "incorrect id")
+		return
+	}
+	if err := h.learnLinks.Unlink(r.Context(), motherID); err != nil {
+		log.Printf("unlink learn error: %v", err)
+		httpx.WriteError(w, http.StatusInternalServerError, "server error")
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+func (h *Handler) listLearners(w http.ResponseWriter, r *http.Request) {
+	if h.learnerReader == nil {
+		httpx.WriteJSON(w, http.StatusOK, []LearnerDTO{})
+		return
+	}
+	learners, err := h.learnerReader.GetAllLearners(r.Context())
+	if err != nil {
+		log.Printf("list learners error: %v", err)
+		httpx.WriteError(w, http.StatusInternalServerError, "server error")
+		return
+	}
+	dtos := make([]LearnerDTO, len(learners))
+	for i, l := range learners {
+		dtos[i] = LearnerDTO{
+			UserID:    l.UserID,
+			FirstName: l.FirstName,
+			LastName:  l.LastName,
+			Email:     l.Email,
+		}
+	}
+	httpx.WriteJSON(w, http.StatusOK, dtos)
 }

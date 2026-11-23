@@ -45,7 +45,7 @@ type reportResponse struct {
 
 func filterFrom(r *http.Request) report.Filter {
 	q := r.URL.Query()
-	return report.Filter{From: q.Get("from"), To: q.Get("to")}
+	return report.Filter{From: q.Get("from"), To: q.Get("to"), ProblemType: q.Get("problemType")}
 }
 
 func (h *Handler) get(w http.ResponseWriter, r *http.Request) {

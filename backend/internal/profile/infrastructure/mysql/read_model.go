@@ -27,14 +27,14 @@ func (r *readModel) GetByMother(ctx context.Context, motherID int) (query.Profil
 		`SELECT mother_id, COALESCE(DATE_FORMAT(birth_date, '%Y-%m-%d'), ''), birth_place,
 		        citizenship, registration, living, email, religion, education, profession,
 		        income_source, income_amount, marital_status, father_info, pregnancy_weeks,
-		        situation, expected_help, source, status, updated_at
+		        situation, problem_type, expected_help, source, status, updated_at
 		 FROM mother_profile WHERE mother_id = ?`,
 		motherID,
 	).Scan(
 		&v.MotherID, &v.BirthDate, &v.BirthPlace, &v.Citizenship, &v.Registration,
 		&v.Living, &v.Email, &v.Religion, &v.Education, &v.Profession, &v.IncomeSource,
 		&v.IncomeAmount, &v.MaritalStatus, &v.FatherInfo, &v.PregnancyWeeks,
-		&v.Situation, &v.ExpectedHelp, &v.Source, &statusStr, &updatedAt,
+		&v.Situation, &v.ProblemType, &v.ExpectedHelp, &v.Source, &statusStr, &updatedAt,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return query.ProfileView{}, domain.ErrNotFilled
