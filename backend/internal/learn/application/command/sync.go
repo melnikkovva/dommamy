@@ -21,8 +21,6 @@ func NewSyncHandler(repo domain.WriteRepository, api domain.APIClient) SyncAll {
 }
 
 func (h *syncHandler) SyncAll(ctx context.Context) error {
-	log.Println("Начало синхронизации с iSpring...")
-
 	learners, err := h.api.FetchAllLearnAccounts(ctx)
 	if err != nil {
 		return err
@@ -30,7 +28,7 @@ func (h *syncHandler) SyncAll(ctx context.Context) error {
 	if err := h.repo.SaveLearners(ctx, learners); err != nil {
 		return err
 	}
-	log.Printf("Синхронизировано пользователей: %d", len(learners))
+	log.Printf("синхронизировано пользователей: %d", len(learners))
 
 	results, err := h.api.FetchAllCourseResults(ctx)
 	if err != nil {
@@ -39,7 +37,7 @@ func (h *syncHandler) SyncAll(ctx context.Context) error {
 	if err := h.repo.SaveCourseResults(ctx, results); err != nil {
 		return err
 	}
-	log.Printf("Синхронизировано результатов обучения: %d", len(results))
+	log.Printf("синхронизировано результатов обучения: %d", len(results))
 
 	iprPlans, err := h.api.FetchAllIPR(ctx)
 	if err != nil {
