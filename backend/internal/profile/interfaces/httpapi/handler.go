@@ -62,6 +62,7 @@ type saveRequest struct {
 	FatherInfo     string `json:"father_info"`
 	PregnancyWeeks int    `json:"pregnancy_weeks"`
 	Situation      string `json:"situation"`
+	ProblemType    string `json:"problem_type"`
 	ExpectedHelp   string `json:"expected_help"`
 	Source         string `json:"source"`
 }
@@ -125,6 +126,7 @@ func (h *Handler) save(w http.ResponseWriter, r *http.Request) {
 		FatherInfo:     req.FatherInfo,
 		PregnancyWeeks: req.PregnancyWeeks,
 		Situation:      req.Situation,
+		ProblemType:    req.ProblemType,
 		ExpectedHelp:   req.ExpectedHelp,
 		Source:         req.Source,
 	}

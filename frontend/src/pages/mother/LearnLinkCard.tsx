@@ -72,9 +72,6 @@ export default function LearnLinkCard({ motherId, learnUserId }: { motherId: num
           {linkedLearner ? 'Изменить' : 'Связать'}
         </button>
       </div>
-      <p className="muted" style={{ marginTop: '8px', fontSize: '12px' }}>
-        Курсы и прогресс обучения появятся после связывания
-      </p>
     </div>
   )
 }

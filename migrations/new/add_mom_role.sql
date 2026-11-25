@@ -1,0 +1,1 @@
+ALTER TABLE app_user ADD COLUMN mother_id INT NOT NULL DEFAULT 0;

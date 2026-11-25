@@ -1,8 +1,10 @@
 import { useState } from 'react'
-import { getReport, reportCsvUrl } from '../api/reports'
+import { downloadReportCsv, getReport } from '../api/reports'
 import { useLoad } from '../hooks/useLoad'
 import LoadState from '../components/LoadState'
 import Field from '../components/Field'
+import { errorText } from '../api/client'
+import { useToast } from '../components/Toast'
 
 const reports: [string, string][] = [
   ['aid', 'Оказанная помощь'],
@@ -19,18 +21,35 @@ const problemTypes: [string, string][] = [
   ['violence', 'Насилие'],
   ['other', 'Другое']
 ]
+const problemTypeTotalLabels = new Set(['Не указана', ...problemTypes.slice(1).map(([, text]) => text)])
 
 export default function ReportsPage() {
+  const toast = useToast()
   const [name, setName] = useState('aid')
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
   const [problemType, setProblemType] = useState('')
+  const [downloading, setDownloading] = useState(false)
   const { data, error } = useLoad(() => getReport(name, from, to, problemType), [name, from, to, problemType])
+
+  async function download() {
+    setDownloading(true)
+    try {
+      await downloadReportCsv(name, from, to, problemType)
+    } catch (err) {
+      toast(errorText(err), true)
+    } finally {
+      setDownloading(false)
+    }
+  }
+
   return (
     <div>
       <div className="page-head">
         <h1>Отчёты</h1>
-        <a className="btn btn-primary" href={reportCsvUrl(name, from, to, problemType)}>Скачать в Excel</a>
+        <button className="btn btn-primary" onClick={download} disabled={downloading}>
+          {downloading ? 'Скачивание...' : 'Скачать в Excel'}
+        </button>
       </div>
       <div className="report-tabs">
         {reports.map(([key, text]) => (
@@ -56,7 +75,13 @@ export default function ReportsPage() {
       {data && !error && data.name === name && (
         <div>
           <div className="stats">
-            {data.totals.map((t) => (
+            {data.totals.filter((t) =>
+              !(name === 'events' && t.label === 'Разных мам') &&
+              !(name === 'mothers' && (
+                problemTypeTotalLabels.has(t.label) ||
+                ['Всего детей', 'Всего консультаций', 'Психолог', 'Юрист', 'Батюшка', 'Центр занятости'].includes(t.label)
+              ))
+            ).map((t) => (
               <div className="stat" key={t.label}>
                 <div className="label">{t.label}</div>
                 <div className="value" style={{ fontSize: 22 }}>{t.value}</div>
@@ -64,7 +89,7 @@ export default function ReportsPage() {
             ))}
           </div>
           <div className="card">
-            <h2>{data.title} строк: {data.rows.length}</h2>
+            <h2>{data.title} : {data.rows.length}</h2>
             <div className="table-wrap">
               <table>
                 <thead><tr>{data.headers.map((h) => <th key={h}>{h}</th>)}</tr></thead>

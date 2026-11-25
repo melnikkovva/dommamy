@@ -1,0 +1,1 @@
+ALTER TABLE mother ADD COLUMN learn_user_id VARCHAR(100) NULL;

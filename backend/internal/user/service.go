@@ -15,11 +15,12 @@ type Repository interface {
 	UserById(id int) (*User, error)
 	UserByLogin(login string) (*User, error)
 	ListUsers() ([]*User, error)
+	DeleteUser(id int) error
 }
 
 type Service struct {
-	repo    Repository
-	secret  []byte
+	repo     Repository
+	secret   []byte
 	tokenTTL time.Duration
 }
 
@@ -86,6 +87,10 @@ func (s *Service) GetUser(id int) (*User, error) {
 
 func (s *Service) ListUsers() ([]*User, error) {
 	return s.repo.ListUsers()
+}
+
+func (s *Service) DeleteUser(id int) error {
+	return s.repo.DeleteUser(id)
 }
 
 func (s *Service) generateToken(u *User) (string, error) {

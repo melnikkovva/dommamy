@@ -1,16 +1,52 @@
 import { useState } from 'react'
 import { useLoad } from '../hooks/useLoad'
-import { listUsers, createUser, UserResponse } from '../api/auth'
+import { listUsers, createUser, deleteUser, getUser, UserResponse } from '../api/auth'
 import { getMothers } from '../api/mothers'
 import { errorText } from '../api/client'
+import Modal from '../components/Modal'
+import { useToast } from '../components/Toast'
 import type { Mother } from '../types'
+
+function ConfirmDeleteUserModal({ user, onDeleted, onClose }: { user: UserResponse; onDeleted: () => void; onClose: () => void }) {
+  const toast = useToast()
+  const [loading, setLoading] = useState(false)
+
+  async function handleDelete() {
+    setLoading(true)
+    try {
+      await deleteUser(user.id)
+      toast('Пользователь удалён')
+      onDeleted()
+    } catch (err) {
+      toast(errorText(err), true)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <Modal title="Удаление пользователя" onClose={onClose}>
+      <p style={{ margin: '0 0 16px' }}>
+        Вы действительно хотите удалить <strong>{user.first_name} {user.last_name}</strong>? Данные будут скрыты, но сохранены в системе.
+      </p>
+      <div className="dialog-buttons">
+        <button type="button" className="btn" onClick={onClose} disabled={loading}>Отмена</button>
+        <button type="button" className="btn btn-danger" onClick={handleDelete} disabled={loading}>
+          {loading ? 'Удаление...' : 'Удалить'}
+        </button>
+      </div>
+    </Modal>
+  )
+}
 
 export default function UsersPage() {
   const { data: users, error, reload } = useLoad(listUsers, [])
   const { data: mothers } = useLoad(getMothers, [])
   const [showForm, setShowForm] = useState(false)
+  const [deleting, setDeleting] = useState<UserResponse | null>(null)
   const [formError, setFormError] = useState('')
   const [formLoading, setFormLoading] = useState(false)
+  const currentUser = getUser()
 
   const [login, setLogin] = useState('')
   const [password, setPassword] = useState('')
@@ -121,6 +157,7 @@ export default function UsersPage() {
                 <th>Фамилия</th>
                 <th>Роль</th>
                 <th>Создан</th>
+                <th>Действия</th>
               </tr>
             </thead>
             <tbody>
@@ -134,11 +171,22 @@ export default function UsersPage() {
                     {u.mother_id > 0 && u.role === 'mom' && <span className="muted" style={{ marginLeft: 6 }}>#{u.mother_id}</span>}
                   </td>
                   <td>{new Date(u.created_at).toLocaleDateString('ru-RU')}</td>
+                  <td>
+                    <button
+                      className="btn btn-danger"
+                      style={{ padding: '2px 8px', fontSize: '13px' }}
+                      onClick={() => setDeleting(u)}
+                      disabled={u.id === currentUser?.id}
+                      title={u.id === currentUser?.id ? 'Нельзя удалить текущую учетную запись' : undefined}
+                    >
+                      Удалить
+                    </button>
+                  </td>
                 </tr>
               ))}
               {(!users || users.length === 0) && (
                 <tr>
-                  <td colSpan={5} style={{ textAlign: 'center', padding: 20, color: 'var(--muted)' }}>
+                  <td colSpan={6} style={{ textAlign: 'center', padding: 20, color: 'var(--muted)' }}>
                     Пользователей пока нет
                   </td>
                 </tr>
@@ -147,6 +195,13 @@ export default function UsersPage() {
           </table>
         </div>
       </div>
+      {deleting && (
+        <ConfirmDeleteUserModal
+          user={deleting}
+          onClose={() => setDeleting(null)}
+          onDeleted={() => { setDeleting(null); void reload() }}
+        />
+      )}
     </div>
   )
 }

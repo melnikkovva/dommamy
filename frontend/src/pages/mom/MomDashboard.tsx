@@ -222,7 +222,6 @@ export default function MomDashboard() {
               <div className="page-head">
                 <div>
                   <h1>{greeting}, {firstName}</h1>
-                  <p className="muted">{dateStr}. Мы рядом, если нужна поддержка.</p>
                 </div>
               </div>
 
@@ -249,7 +248,7 @@ export default function MomDashboard() {
                 <div key={ev.id} className="card">
                   <p className="event-date">Ближайшие мероприятия</p>
                   <p className="event-name">{ev.title}</p>
-                  <p className="muted">📍 {ev.place || 'Центр'}</p>
+                  <p className="muted">{ev.place || 'Центр'}</p>
                   <p className="muted">Свободно {ev.max_people > 0 ? ev.max_people : '—'} мест</p>
                 </div>
               ))}
@@ -363,9 +362,9 @@ export default function MomDashboard() {
                   {events.map((ev: any) => (
                     <div key={ev.id} className="event-item">
                       <p className="event-name">{ev.title}</p>
-                      {ev.type_name && <p className="muted" style={{fontSize: 12}}>🏷 {ev.type_name}</p>}
+                      {ev.type_name && <p className="muted" style={{fontSize: 12}}>{ev.type_name}</p>}
                       <p className="muted">{fmtDateTime(ev.starts_at)}</p>
-                      <p className="muted">📍 {ev.place || 'Центр'}</p>
+                      <p className="muted">{ev.place || 'Центр'}</p>
                       <span className="badge badge-wait">Записана</span>
                     </div>
                   ))}
@@ -380,9 +379,9 @@ export default function MomDashboard() {
                   .map((ev: any) => (
                     <div key={ev.id} className="event-item">
                       <p className="event-name">{ev.title}</p>
-                      {ev.type_name && <p className="muted" style={{fontSize: 12}}>🏷 {ev.type_name}</p>}
+                      {ev.type_name && <p className="muted" style={{fontSize: 12}}>{ev.type_name}</p>}
                       <p className="muted">{fmtDateTime(ev.starts_at)}</p>
-                      <p className="muted">📍 {ev.place || 'Центр'}</p>
+                      <p className="muted">{ev.place || 'Центр'}</p>
                       <p className="muted">Свободно {ev.max_people > 0 ? ev.max_people : '—'} мест из {ev.max_people || '—'}</p>
                     </div>
                   ))
@@ -480,7 +479,6 @@ export default function MomDashboard() {
                   {documents.map((d: any, i: number) => (
                     <div key={d.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: i < documents.length - 1 ? '1px solid var(--border)' : 'none' }}>
                       <span>{d.type}</span>
-                      <span style={{ color: 'var(--green)' }}>📄</span>
                     </div>
                   ))}
                 </div>

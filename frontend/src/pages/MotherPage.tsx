@@ -10,10 +10,8 @@ import DocumentsTab from './mother/DocumentsTab'
 import HelpTab from './mother/HelpTab'
 import EventsTab from './mother/EventsTab'
 import ConsultationsTab from './mother/ConsultationsTab'
-import RequestsTab from './mother/RequestsTab'
 import CoursesTab from './mother/CoursesTab'
 import IprTab from './mother/IprTab'
-import LearnLinkCard from './mother/LearnLinkCard'
 import { ageYears, fmtDate, fullName, yearsText } from '../utils/format'
 
 const tabs: [string, string][] = [
@@ -23,8 +21,7 @@ const tabs: [string, string][] = [
   ['events', 'Мероприятия'],
   ['consultations', 'Консультации'],
   ['courses', 'Курсы'],
-  ['ipr', 'ИПР'],
-  ['requests', 'Заметки']
+  ['ipr', 'ИПР']
 ]
 
 export default function MotherPage() {
@@ -99,8 +96,6 @@ export default function MotherPage() {
       {tab === 'consultations' && <ConsultationsTab motherId={id} />}
       {tab === 'courses' && <CoursesTab motherId={id} />}
       {tab === 'ipr' && <IprTab motherId={id} />}
-      {tab === 'requests' && <RequestsTab motherId={id} />}
-      <LearnLinkCard motherId={id} learnUserId={mother.learn_user_id || undefined} />
       {viewPhoto && (
         <div className="modal-backdrop" onClick={() => setViewPhoto(null)}>
           <img className="photo-view" src={viewPhoto} alt="Фото" onClick={(e) => e.stopPropagation()} />

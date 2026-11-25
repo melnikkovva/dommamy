@@ -39,9 +39,7 @@ export default function LoginPage() {
         <div className="login-form-side">
           <div className="login-container">
             <div className="login-header">
-              <div className="logo-icon"><img src="/favicon.png" alt="" width="28" height="28" /></div>
               <h1>Дом мамы</h1>
-              <p>Вход в систему</p>
             </div>
 
             <form className="card login-form" onSubmit={handleSubmit}>

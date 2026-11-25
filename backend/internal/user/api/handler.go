@@ -5,8 +5,8 @@ import (
 	"net/http"
 
 	"backend/internal/auth"
-	"backend/internal/user"
 	"backend/internal/shared/httpx"
+	"backend/internal/user"
 )
 
 type Handler struct {
@@ -23,6 +23,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/users", h.createUser)
 	mux.HandleFunc("GET /api/users", h.listUsers)
 	mux.HandleFunc("GET /api/users/{id}", h.getUser)
+	mux.HandleFunc("DELETE /api/users/{id}", h.deleteUser)
 }
 
 type loginBody struct {
@@ -31,13 +32,13 @@ type loginBody struct {
 }
 
 type loginResponse struct {
-	Token       string `json:"token"`
-	Id          int    `json:"id"`
-	Login       string `json:"login"`
-	FirstName   string `json:"first_name"`
-	LastName    string `json:"last_name"`
-	Role        string `json:"role"`
-	MotherId    int    `json:"mother_id"`
+	Token     string `json:"token"`
+	Id        int    `json:"id"`
+	Login     string `json:"login"`
+	FirstName string `json:"first_name"`
+	LastName  string `json:"last_name"`
+	Role      string `json:"role"`
+	MotherId  int    `json:"mother_id"`
 }
 
 type userResponse struct {
@@ -175,4 +176,30 @@ func (h *Handler) getUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.WriteJSON(w, http.StatusOK, toUserResponse(u))
+}
+
+func (h *Handler) deleteUser(w http.ResponseWriter, r *http.Request) {
+	claims, ctxErr := auth.FromContext(r.Context())
+	if ctxErr != nil || claims.Role != user.RoleAdmin {
+		httpx.WriteError(w, http.StatusForbidden, "только администратор может удалять пользователей")
+		return
+	}
+	id, err := httpx.PathID(r, "id")
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "incorrect id")
+		return
+	}
+	if claims.UserID == id {
+		httpx.WriteError(w, http.StatusConflict, "нельзя удалить свою учетную запись")
+		return
+	}
+	if err := h.s.DeleteUser(id); err != nil {
+		if errors.Is(err, user.ErrorNotFound) {
+			httpx.WriteError(w, http.StatusNotFound, "user not found")
+			return
+		}
+		httpx.WriteError(w, http.StatusInternalServerError, "something went wrong")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }

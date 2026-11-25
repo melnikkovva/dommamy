@@ -154,6 +154,10 @@ a:hover {
   max-width: 1200px;
 }
 
+.mom-bottom-nav {
+  display: none;
+}
+
 .page-head {
   display: flex;
   justify-content: space-between;
@@ -782,7 +786,7 @@ tr.clickable:hover td {
   }
 
   .main {
-    padding-bottom: 72px;
+    padding-bottom: calc(72px + env(safe-area-inset-bottom));
   }
 
   .content {
@@ -873,7 +877,7 @@ tr.clickable:hover td {
   }
 
   .mom-bottom-nav {
-    display: flex !important;
+    display: flex;
     position: fixed;
     bottom: 0;
     left: 0;
@@ -881,7 +885,7 @@ tr.clickable:hover td {
     background: var(--white);
     border-top: 1px solid var(--border);
     justify-content: space-around;
-    padding: 6px 0;
+    padding: 6px 0 calc(6px + env(safe-area-inset-bottom));
     z-index: 30;
   }
 
@@ -1065,10 +1069,6 @@ tr.clickable:hover td {
   color: var(--mom-primary);
 }
 
-.mom-help-prompt::before {
-  content: '♡ ';
-}
-
 .mom-help-desc {
   font-size: 14px;
   color: var(--mom-text-secondary);
@@ -1187,11 +1187,6 @@ tr.clickable:hover td {
   margin: 0 0 8px;
 }
 
-.mom-event-card h3::before {
-  content: '📅 ';
-  font-size: 12px;
-}
-
 .mom-event-name {
   font-size: 17px;
   font-weight: 600;
@@ -1202,11 +1197,6 @@ tr.clickable:hover td {
   font-size: 14px;
   color: var(--mom-text-secondary);
   margin: 0 0 4px;
-}
-
-.mom-event-info::before {
-  content: '📍 ';
-  font-size: 12px;
 }
 
 .mom-event-seats {
@@ -1333,10 +1323,6 @@ tr.clickable:hover td {
 .mom-hint strong {
   display: block;
   margin-bottom: 4px;
-}
-
-.mom-bottom-nav {
-  display: none;
 }
 
 .mom-mobile-header {

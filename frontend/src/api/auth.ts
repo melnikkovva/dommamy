@@ -1,4 +1,4 @@
-import { post, get, ApiError } from './client'
+import { post, get, remove } from './client'
 
 export interface AuthUser {
   id: number
@@ -48,6 +48,10 @@ export async function listUsers(): Promise<UserResponse[]> {
 
 export async function createUser(req: CreateUserRequest): Promise<UserResponse> {
   return post<UserResponse>('/api/users', req)
+}
+
+export async function deleteUser(userId: number): Promise<void> {
+  return remove<void>('/api/users/' + userId)
 }
 
 export function getToken(): string | null {

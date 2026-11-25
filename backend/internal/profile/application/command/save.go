@@ -25,6 +25,7 @@ type Save struct {
 	FatherInfo     string
 	PregnancyWeeks int
 	Situation      string
+	ProblemType    string
 	ExpectedHelp   string
 	Source         string
 }
@@ -78,6 +79,7 @@ func (h *saveHandler) Handle(ctx context.Context, cmd Save) error {
 		FatherInfo:     cmd.FatherInfo,
 		PregnancyWeeks: cmd.PregnancyWeeks,
 		Situation:      cmd.Situation,
+		ProblemType:    cmd.ProblemType,
 		ExpectedHelp:   cmd.ExpectedHelp,
 		Source:         cmd.Source,
 	}, h.now()); err != nil {

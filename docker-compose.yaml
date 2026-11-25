@@ -20,6 +20,7 @@ services:
       - ./migrations/add_ipr.sql:/docker-entrypoint-initdb.d/009_add_ipr.sql
       - ./migrations/add_consultation.sql:/docker-entrypoint-initdb.d/010_add_consultation.sql
       - ./migrations/add_problem_type.sql:/docker-entrypoint-initdb.d/011_add_problem_type.sql
+      - ./migrations/add_user_soft_delete.sql:/docker-entrypoint-initdb.d/012_add_user_soft_delete.sql
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$$MYSQL_ROOT_PASSWORD"]
       interval: 5s
