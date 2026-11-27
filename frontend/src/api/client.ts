@@ -22,6 +22,13 @@ export async function send<T>(method: string, url: string, body?: BodyInit, head
     }
   }
   if (!res.ok) {
+    if (res.status === 401 && url !== '/api/auth/login') {
+      localStorage.removeItem('auth_token')
+      localStorage.removeItem('auth_user')
+      if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+        window.location.replace('/login')
+      }
+    }
     throw new ApiError((data && data.error) || 'Ошибка сервера (код ' + res.status + ')', res.status)
   }
   return data as T
